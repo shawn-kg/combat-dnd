@@ -1,0 +1,15 @@
+# Local Postgres for development. Matches the defaults in backend/src/main/resources/application.yml.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: combat_dnd
+      POSTGRES_USER: combat
+      POSTGRES_PASSWORD: combat
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

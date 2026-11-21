@@ -1,0 +1,77 @@
+/*
+ * Combat D&D design tokens. Dark is the default; light follows the OS or data-theme="light".
+ * Source of truth: the "Visual design" section of the design doc and the clickable mockup.
+ */
+:root {
+  --bg: #14161b;
+  --surface: #1c1f26;
+  --raised: #252932;
+  --border: #323744;
+  --border-strong: #454b5b;
+  --text: #ece6d8;
+  --muted: #9c978b;
+  --gold: #d4a64a;
+  --gold-soft: rgba(212, 166, 74, 0.16);
+  --on-gold: #1b1406;
+  --party: #3f8c96;
+  --party-bg: #1b3239;
+  --enemy: #b5473d;
+  --enemy-bg: #361e21;
+  --hp-high: #6dbe7a;
+  --hp-mid: #e0a33a;
+  --hp-low: #d9534f;
+  --react: #a18fd8;
+  --react-bg: #2a2540;
+
+  --font-display: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f3ede0;
+    --surface: #fbf8f1;
+    --raised: #ffffff;
+    --border: #dcd2be;
+    --border-strong: #c4b89f;
+    --text: #2a2620;
+    --muted: #6c655a;
+    --gold: #9e7418;
+    --gold-soft: rgba(158, 116, 24, 0.14);
+    --on-gold: #fff9ec;
+    --party: #2a6c75;
+    --party-bg: #ddebec;
+    --enemy: #9e3a31;
+    --enemy-bg: #f3e0db;
+    --hp-high: #3b8a4a;
+    --hp-mid: #b07610;
+    --hp-low: #b73a35;
+    --react: #6550a8;
+    --react-bg: #e9e4f6;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --bg: #f3ede0;
+  --surface: #fbf8f1;
+  --raised: #ffffff;
+  --border: #dcd2be;
+  --border-strong: #c4b89f;
+  --text: #2a2620;
+  --muted: #6c655a;
+  --gold: #9e7418;
+  --gold-soft: rgba(158, 116, 24, 0.14);
+  --on-gold: #fff9ec;
+  --party: #2a6c75;
+  --party-bg: #ddebec;
+  --enemy: #9e3a31;
+  --enemy-bg: #f3e0db;
+  --hp-high: #3b8a4a;
+  --hp-mid: #b07610;
+  --hp-low: #b73a35;
+  --react: #6550a8;
+  --react-bg: #e9e4f6;
+  color-scheme: light;
+}

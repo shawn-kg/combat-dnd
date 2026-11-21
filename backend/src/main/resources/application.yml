@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: combat-dnd
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/combat_dnd}
+    username: ${DATABASE_USER:combat}
+    password: ${DATABASE_PASSWORD:combat}
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
