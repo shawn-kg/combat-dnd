@@ -3,7 +3,7 @@
 Live D&D 5e combat tracking for a remote group: the DM and each player on their own laptop, sharing one
 initiative list. The DM sees everything; players see their own options and what their characters would know.
 
-- Design doc: https://claude.ai/artifact/EvjGJzwvnNzExE1oMbCCAH
+- Design doc: [docs/design.md](docs/design.md) (editable version: https://claude.ai/artifact/EvjGJzwvnNzExE1oMbCCAH)
 - Clickable mockup: https://claude.ai/artifact/2YbcoLEwtTzEnpHRycCKpn
 
 **Principle:** track, don't enforce. The app records what happened and shows hints. The DM rules.
