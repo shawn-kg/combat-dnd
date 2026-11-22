@@ -45,12 +45,31 @@ create table encounter (
     id                   uuid primary key default gen_random_uuid(),
     campaign_id          uuid        not null references campaign (id) on delete cascade,
     name                 text        not null,
-    status               text        not null default 'PREPARING' check (status in ('PREPARING', 'ACTIVE', 'ENDED')),
+    status               text        not null default 'PREPARING'
+        check (status in ('PREPARING', 'ROLLING_INITIATIVE', 'ACTIVE', 'ENDED')),
     round                int         not null default 0,
     current_combatant_id uuid,
     version              bigint      not null default 0,
     created_at           timestamptz not null default now()
 );
+
+-- The saved roster the DM prepares ahead of time. Start combat turns it into combatant rows.
+create table encounter_party (
+    encounter_id uuid    not null references encounter (id) on delete cascade,
+    character_id uuid    not null references character (id) on delete cascade,
+    included     boolean not null default true, -- untick anyone who isn't playing tonight
+    primary key (encounter_id, character_id)
+);
+
+create table encounter_enemy (
+    id                  uuid primary key default gen_random_uuid(),
+    encounter_id        uuid    not null references encounter (id) on delete cascade,
+    monster_template_id uuid    not null references monster_template (id) on delete cascade,
+    count               int     not null default 1 check (count between 1 and 20),
+    hidden              boolean not null default false,
+    sort_order          int     not null default 0
+);
+create index encounter_enemy_encounter_idx on encounter_enemy (encounter_id);
 
 create table combatant (
     id                  uuid primary key default gen_random_uuid(),

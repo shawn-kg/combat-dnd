@@ -1,5 +1,5 @@
 import type { CombatantView, EncounterView } from '../api/types'
-import { describeLastTurn, initials } from './lastTurn'
+import { describeAttack, initials, totalLine } from './lastTurn'
 import './tracker.css'
 
 /** The initiative tracker: one row per combatant, in initiative order, like D&D Beyond's. */
@@ -41,7 +41,15 @@ function TrackerRow({ c }: { c: CombatantView }) {
       <Hp hp={c.hp} max={c.maxHp} />
       <span className="last">
         {c.lastTurn ? (
-          <span className={c.lastTurn.hits > 0 ? 'hit' : 'miss'}>{describeLastTurn(c.lastTurn)}</span>
+          <>
+            <span className="round-tag">Round {c.lastTurn.round}</span>
+            {c.lastTurn.attacks.map((a) => (
+              <span key={a.id} className={a.hit ? 'hit' : 'miss'}>
+                {describeAttack(a)}
+              </span>
+            ))}
+            {totalLine(c.lastTurn) && <span className="total">{totalLine(c.lastTurn)}</span>}
+          </>
         ) : (
           <span className="muted">—</span>
         )}

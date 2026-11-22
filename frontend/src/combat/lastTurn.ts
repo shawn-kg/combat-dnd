@@ -1,16 +1,14 @@
-import type { LastTurnView } from '../api/types'
+import type { AttackView, LastTurnView } from '../api/types'
 
-/** "Hit Goblin 2 · 9", "Miss", or "2 hits, 1 miss · 17". */
-export function describeLastTurn(t: LastTurnView): string {
-  if (t.attacks.length === 1) {
-    const a = t.attacks[0]
-    const target = a.targetName ? ` ${a.targetName}` : ''
-    return a.hit ? `Hit${target} · ${a.damage}` : `Miss${target}`
-  }
-  const parts = []
-  if (t.hits > 0) parts.push(`${t.hits} hit${t.hits > 1 ? 's' : ''}`)
-  if (t.misses > 0) parts.push(`${t.misses} miss${t.misses > 1 ? 'es' : ''}`)
-  return t.damage > 0 ? `${parts.join(', ')} · ${t.damage}` : parts.join(', ')
+/** One line per attack: "Hit Goblin 2 · 9" or "Miss Goblin 1". The target is left out when the viewer can't see it. */
+export function describeAttack(a: AttackView): string {
+  const target = a.targetName ? ` ${a.targetName}` : ''
+  return a.hit ? `Hit${target} · ${a.damage}` : `Miss${target}`
+}
+
+/** A total line only when the turn had more than one attack and did some damage. */
+export function totalLine(t: LastTurnView): string | null {
+  return t.attacks.length > 1 && t.damage > 0 ? `Total ${t.damage}` : null
 }
 
 /** Up to two initials, for rows without a portrait. */

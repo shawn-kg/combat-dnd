@@ -1,6 +1,6 @@
 # Combat D&D Design Doc
 
-> Snapshot of the living design doc as of 2026-11-22. The editable version, with comments, is at
+> Snapshot of the living design doc as of 2026-11-22 (prep, initiative and per-attack last turn added). The editable version, with comments, is at
 > https://claude.ai/artifact/EvjGJzwvnNzExE1oMbCCAH. Update this file when the design changes.
 
 ## Overview
@@ -53,16 +53,25 @@ The DM can unassign a character (if someone picked the wrong one), remove a play
 
 The DM uploads a picture for each character and monster template. It's cropped to a square and shown as a circle. Without a picture, the row shows the name's initials on a party or enemy colored background.
 
-### Encounter prep
+### Prep before the session
 
-Before the session, the DM builds encounters: enemies from templates ("Goblin × 4" becomes Goblin 1–4, each with the template's portrait, AC and HP), one-off enemies, and hidden reinforcements. Initiative can be typed in ahead of time.
+Everything the DM sets up is saved, so starting a fight takes seconds.
+
+- **Party:** the characters persist between sessions. The DM sets each one's portrait, AC, HP and max HP, and HP carries over from the last fight.
+- **Saved encounters:** the DM can keep several ready, for example "Goblin Ambush" and "Wolves at the Bridge". Each one lists which party members are in it (untick anyone who isn't playing tonight) and its enemies from templates, with a count and a hidden option ("Goblin × 2", "Goblin Archer × 1, hidden").
+- Changes save automatically. Nothing needs to be re-entered at the table.
+
+### Starting combat
+
+1. The DM opens a saved encounter and presses **Start combat**. The roster becomes a list of combatants; repeated enemies are numbered (Goblin 1, Goblin 2).
+2. **Initiative:** the DM types everyone's roll, presses **Sort by initiative**, and uses the up and down arrows to break ties. Players see "Rolling initiative" until then.
+3. **Begin round 1** puts the list in that order and highlights the first combatant who isn't hidden.
 
 ### Running combat
 
-1. The DM starts the encounter. Every party character is added.
-2. The DM types each initiative and the list sorts itself. The DM can drag to break ties.
-3. The current turn's row is highlighted for everyone. **Next turn** and **Previous turn** move it; the round counts up on wrap-around.
-4. During the fight the DM can add enemies, reveal hidden ones, remove or mark defeated, and edit any field inline.
+1. The current turn's row is highlighted for everyone. **Next turn** and **Previous turn** move it; the round counts up on wrap-around.
+2. During the fight the DM can add enemies, reveal hidden ones, remove or mark defeated, and edit any field inline.
+3. **End combat** writes the party's HP back to their characters and returns to prep.
 
 ### Logging a turn
 
@@ -72,7 +81,9 @@ On their turn, a player presses **Log attack** on their row:
 2. Choose **Hit** or **Miss**.
 3. On a hit, type the damage. It comes off the target's HP right away.
 
-They can log several attacks in one turn. The row's last-turn line sums them up, for example "Hit Goblin 2 · 9 damage" or "2 hits, 1 miss · 17 damage". The DM logs enemy turns the same way. The DM can edit or delete any entry, and the target's HP is corrected to match.
+They can log several attacks in one turn and remove one they got wrong. **End turn** sits in the same panel as **Log**; if an attack is filled in but not logged yet, ending the turn logs it first.
+
+The row's last-turn line lists every attack from that turn, plus a total when there's more than one, for example "Hit Thorin · 6", "Hit Thorin · 7", "Total 13". The DM logs enemy turns the same way. The DM can edit or delete any entry, and the target's HP is corrected to match.
 
 ## Data model
 
@@ -84,9 +95,11 @@ Postgres holds everything except image files, which go to object storage. The se
 | `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords |
 | `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
 | `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |
-| `encounter` | name, status (PREPARING, ACTIVE, ENDED), round, current_combatant_id, version | `version` guards against conflicting edits |
+| `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), round, current_combatant_id, version | `version` guards against conflicting edits |
 | `combatant` | encounter_id, side (PARTY, ENEMY), character_id or monster_template_id, name, portrait_key, initiative, sort_order, ac and hp (enemies only), hidden, defeated | One row per participant |
 | `encounter_event` | encounter_id, seq, actor, type, payload, undone, created_at | Append-only; attacks, edits and turn changes |
+
+An encounter's saved roster lives in two more tables: `encounter_party` (encounter_id, character_id, included) and `encounter_enemy` (encounter_id, monster_template_id, count, hidden). **Start combat** turns the roster into `combatant` rows.
 
 `portrait_key` names a file in object storage. A player's character is set once, when `character.player_id` is filled; only the DM can change it after that.
 
@@ -121,6 +134,8 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView
 - Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
 - `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
 - Party HP is written back to `character.current_hp`, so it carries over to the next fight.
+
+Starting and ending a fight: `StartCombat` (builds combatants from the roster, status becomes ROLLING_INITIATIVE), `SetInitiative`, `BeginRound1` (ACTIVE), and `EndCombat` (writes party HP back, status becomes ENDED). Roster edits during prep are plain CRUD: `PUT /api/encounters/{id}/roster`.
 
 ### API
 
@@ -183,7 +198,7 @@ The tracker is one list of rows in initiative order, like D&D Beyond. Dark is th
 - **Portrait**: a 48 px circle, with a party (teal) or enemy (red) ring. Initials when there's no picture.
 - **Side**: a colored left edge plus the ring color, never color alone; party and enemies keep a shield or skull icon.
 - **HP**: numbers plus a bar that turns amber below 50% and red below 25%. Players see a dash for enemy AC and HP.
-- **Last turn**: "Hit Goblin 2 · 9", "Miss", or "2 hits, 1 miss · 17". Hits in green, misses muted, damage in red.
+- **Last turn**: one line per attack ("Hit Goblin 2 · 9", "Miss Goblin 1"), with a total when there are several. Hits in green, misses muted, damage in red.
 - **Current turn**: gold border and glow; the list scrolls to it on each turn change.
 - **Defeated**: greyed out with a strikethrough. **Hidden** (DM only): dashed border and an eye-off icon.
 - The color tokens from the earlier design stay the same (`frontend/src/styles/tokens.css`).

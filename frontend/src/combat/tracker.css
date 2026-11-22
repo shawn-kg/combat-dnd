@@ -151,6 +151,21 @@
 .last {
   font-size: 13px;
   overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.last .round-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.last .total {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
 }
 .last .hit {
   color: var(--hp-high);
