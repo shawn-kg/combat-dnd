@@ -2,49 +2,44 @@ package app.combatdnd.encounter.domain
 
 /** Something an actor is trying to do. `decide` turns it into events or a rejection. */
 sealed interface Command {
-    data class DeclareAttack(
+    /** Log one attack. On a hit, the damage comes off the target's HP right away. */
+    data class LogAttack(
+        val attackerId: CombatantId,
         val targetId: CombatantId,
-        val label: String,
-        val kind: AttackKind = AttackKind.ATTACK,
-        val cost: Cost,
-        val costNote: String? = null,
-        val roll: Int,
-        val rollMode: RollMode = RollMode.NORMAL,
-        val natural: Natural? = null,
-        val early: Boolean = false,
+        val hit: Boolean,
+        val damage: Int = 0,
     ) : Command
 
-    /** DM: hit (or failed save) / miss (or saved). */
-    data class ResolveAttack(val hit: Boolean) : Command
+    /** Correct a logged attack. HP is adjusted by the difference. */
+    data class EditAttack(val attackId: AttackId, val hit: Boolean, val damage: Int) : Command
 
-    /** DM uses the target enemy's reaction (e.g. Parry) before calling the attack. */
-    data class EnemyReact(val reaction: String) : Command
-
-    /** DM returns the pending step to the attacker with a reason. */
-    data class SendBack(val reason: String) : Command
-
-    /** Attacker answers a send-back with a new roll. */
-    data class Resubmit(
-        val roll: Int,
-        val rollMode: RollMode = RollMode.NORMAL,
-        val natural: Natural? = null,
-    ) : Command
-
-    /** Target (or DM) uses a reaction in the reaction window. Unknown names are logged as-is. */
-    data class React(val reaction: String) : Command
-
-    data object SkipReaction : Command
-
-    data class SubmitDamage(val amount: Int, val damageType: String) : Command
-
-    /** DM applies damage, possibly adjusted. */
-    data class ApplyDamage(val amount: Int) : Command
-
-    /** A reaction outside the attack flow, e.g. an opportunity attack. */
-    data class UseReaction(val combatantId: CombatantId, val label: String) : Command
-
-    /** Dash, Disengage, Dodge, Help, Hide, Ready, Search, Use an Object, or a character option such as Second Wind. */
-    data class UseStandardAction(val label: String, val cost: Cost) : Command
+    /** Remove a logged attack. Its damage is given back. */
+    data class DeleteAttack(val attackId: AttackId) : Command
 
     data object NextTurn : Command
+
+    data object PreviousTurn : Command
+
+    /** DM only from here down. */
+    data class AddCombatant(val combatant: Combatant) : Command
+
+    data class RemoveCombatant(val id: CombatantId) : Command
+
+    data class RevealCombatant(val id: CombatantId) : Command
+
+    data class SetDefeated(val id: CombatantId, val defeated: Boolean) : Command
+
+    /** Any field the DM wants to change. Null means "leave as is". Changing initiative re-sorts the list. */
+    data class EditCombatant(
+        val id: CombatantId,
+        val name: String? = null,
+        val portraitKey: String? = null,
+        val initiative: Int? = null,
+        val ac: Int? = null,
+        val hp: Int? = null,
+        val maxHp: Int? = null,
+    ) : Command
+
+    /** Manual order, e.g. to break an initiative tie. Must list every combatant once. */
+    data class Reorder(val order: List<CombatantId>) : Command
 }

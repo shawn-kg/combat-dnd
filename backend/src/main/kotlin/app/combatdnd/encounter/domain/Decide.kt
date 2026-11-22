@@ -1,23 +1,5 @@
 package app.combatdnd.encounter.domain
 
-import app.combatdnd.encounter.domain.AttackStage.AWAITING_DAMAGE
-import app.combatdnd.encounter.domain.AttackStage.DAMAGE_SUBMITTED
-import app.combatdnd.encounter.domain.AttackStage.DECLARED
-import app.combatdnd.encounter.domain.AttackStage.REACTION_WINDOW
-import app.combatdnd.encounter.domain.AttackStage.RESUBMIT
-import app.combatdnd.encounter.domain.Command.ApplyDamage
-import app.combatdnd.encounter.domain.Command.DeclareAttack
-import app.combatdnd.encounter.domain.Command.EnemyReact
-import app.combatdnd.encounter.domain.Command.NextTurn
-import app.combatdnd.encounter.domain.Command.React
-import app.combatdnd.encounter.domain.Command.ResolveAttack
-import app.combatdnd.encounter.domain.Command.Resubmit
-import app.combatdnd.encounter.domain.Command.SendBack
-import app.combatdnd.encounter.domain.Command.SkipReaction
-import app.combatdnd.encounter.domain.Command.SubmitDamage
-import app.combatdnd.encounter.domain.Command.UseReaction
-import app.combatdnd.encounter.domain.Command.UseStandardAction
-
 sealed interface Decision {
     data class Accepted(val events: List<Event>) : Decision
     data class Rejected(val reason: Reason, val message: String) : Decision
@@ -29,157 +11,156 @@ private fun ok(vararg events: Event) = Decision.Accepted(events.toList())
 private fun forbidden(message: String) = Decision.Rejected(Reason.FORBIDDEN, message)
 private fun invalid(message: String) = Decision.Rejected(Reason.INVALID, message)
 
+private const val DM_ONLY = "Only the DM can do that."
+
 /**
  * May this actor do this now, and what happens if so?
  *
- * Checks only structure: whose turn it is, what is pending, who controls what.
- * Never checks resource limits (track, don't enforce).
+ * The DM may do anything. A player may log attacks for their own character during its turn,
+ * fix their own entries from that turn, and end their own turn.
  */
 fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
-    val pending = state.pending
+    val isDm = actor == Actor.Dm
     return when (cmd) {
-        is DeclareAttack -> {
-            val attacker = state.current
+        is Command.LogAttack -> {
+            val attacker = state.combatants[cmd.attackerId] ?: return invalid("Unknown attacker.")
             val target = state.combatants[cmd.targetId] ?: return invalid("Unknown target.")
             when {
-                !actor.controls(attacker) -> forbidden("It is not your turn.")
-                pending != null -> invalid("Finish the pending attack first.")
+                !actor.controls(attacker) -> forbidden("That isn't your character.")
+                !isDm && state.currentId != attacker.id -> forbidden("You can log attacks on your own turn.")
+                !isDm && target.hidden -> invalid("Unknown target.")
                 target.id == attacker.id -> invalid("Pick someone other than yourself.")
-                target.defeated -> invalid("${target.name} is already defeated.")
-                target.hidden && actor != Actor.Dm -> invalid("Unknown target.")
+                cmd.damage < 0 -> invalid("Damage can't be negative.")
                 else -> ok(
-                    Event.AttackDeclared(
-                        attacker.id, target.id, cmd.label, cmd.kind, cmd.cost, cmd.costNote,
-                        cmd.roll, cmd.rollMode, cmd.natural, cmd.early,
+                    Event.AttackLogged(
+                        id = state.nextAttackId(),
+                        round = state.round,
+                        attackerId = attacker.id,
+                        targetId = target.id,
+                        hit = cmd.hit,
+                        damage = if (cmd.hit) cmd.damage else 0,
                     ),
                 )
             }
         }
 
-        is ResolveAttack -> when {
-            actor != Actor.Dm -> forbidden("Only the DM calls hits and misses.")
-            pending?.stage != DECLARED -> invalid("There is no attack to call.")
-            !cmd.hit -> ok(Event.AttackResolved(false))
-            else -> {
-                val auto = automaticReaction(state, pending)
-                if (auto == null) ok(Event.AttackResolved(true))
-                else ok(Event.AttackResolved(true), Event.ReactionUsed(pending.targetId, auto.name, auto.acBonus, automatic = true))
-            }
-        }
-
-        is EnemyReact -> {
-            val target = pending?.let { state.combatant(it.targetId) }
-            val reaction = target?.reactions?.find { it.name == cmd.reaction }
+        is Command.EditAttack -> {
+            val entry = state.attack(cmd.attackId)?.takeUnless { it.deleted } ?: return invalid("Unknown attack.")
             when {
-                actor != Actor.Dm -> forbidden("Only the DM uses enemy reactions.")
-                pending?.stage != DECLARED || target == null -> invalid("There is no attack to react to.")
-                target.side != Side.ENEMY -> invalid("Only enemies react this way.")
-                reaction == null -> invalid("${target.name} has no reaction called ${cmd.reaction}.")
-                else -> ok(Event.ReactionUsed(target.id, reaction.name, reaction.acBonus, automatic = false))
+                !canFix(state, entry, actor) -> forbidden("Only the DM can change that entry now.")
+                cmd.damage < 0 -> invalid("Damage can't be negative.")
+                else -> ok(Event.AttackEdited(entry.id, cmd.hit, if (cmd.hit) cmd.damage else 0))
             }
         }
 
-        is SendBack -> when {
-            actor != Actor.Dm -> forbidden("Only the DM can send a step back.")
-            cmd.reason.isBlank() -> invalid("Give a reason.")
-            pending?.stage != DECLARED && pending?.stage != DAMAGE_SUBMITTED -> invalid("There is nothing to send back.")
-            else -> ok(Event.AttackSentBack(cmd.reason.trim()))
+        is Command.DeleteAttack -> {
+            val entry = state.attack(cmd.attackId)?.takeUnless { it.deleted } ?: return invalid("Unknown attack.")
+            if (!canFix(state, entry, actor)) forbidden("Only the DM can delete that entry now.")
+            else ok(Event.AttackDeleted(entry.id))
         }
 
-        is Resubmit -> when {
-            pending?.stage != RESUBMIT -> invalid("Nothing was sent back.")
-            !actor.controls(state.combatant(pending.attackerId)) -> forbidden("Only the attacker can resubmit.")
-            else -> ok(Event.AttackResubmitted(cmd.roll, cmd.rollMode, cmd.natural))
-        }
-
-        is React -> {
-            val target = pending?.let { state.combatant(it.targetId) }
+        Command.NextTurn -> {
+            val current = state.currentId?.let(state::combatant)
             when {
-                pending?.stage != REACTION_WINDOW || target == null -> invalid("There is nothing to react to.")
-                !actor.controls(target) -> forbidden("Only ${target.name}'s player can react.")
-                else -> {
-                    val def = target.reactions.find { it.name == cmd.reaction }
-                    ok(Event.ReactionUsed(target.id, cmd.reaction, def?.acBonus ?: 0, automatic = false))
-                }
+                !isDm && (current == null || !actor.controls(current)) -> forbidden("It is not your turn.")
+                else -> nextTurn(state)?.let { (id, round) -> ok(Event.TurnChanged(id, round)) }
+                    ?: invalid("There is nobody to take a turn.")
             }
         }
 
-        SkipReaction -> {
-            val target = pending?.let { state.combatant(it.targetId) }
+        Command.PreviousTurn -> when {
+            !isDm -> forbidden(DM_ONLY)
+            else -> previousTurn(state)?.let { (id, round) -> ok(Event.TurnChanged(id, round)) }
+                ?: invalid("There is no previous turn.")
+        }
+
+        is Command.AddCombatant -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.combatant.id in state.combatants -> invalid("That combatant is already in the encounter.")
+            cmd.combatant.maxHp <= 0 -> invalid("Max HP must be above 0.")
+            else -> ok(Event.CombatantAdded(cmd.combatant))
+        }
+
+        is Command.RemoveCombatant -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.id !in state.combatants -> invalid("Unknown combatant.")
+            else -> ok(Event.CombatantRemoved(cmd.id))
+        }
+
+        is Command.RevealCombatant -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.id !in state.combatants -> invalid("Unknown combatant.")
+            !state.combatant(cmd.id).hidden -> invalid("${state.combatant(cmd.id).name} is already visible.")
+            else -> ok(Event.CombatantRevealed(cmd.id))
+        }
+
+        is Command.SetDefeated -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.id !in state.combatants -> invalid("Unknown combatant.")
+            else -> ok(Event.DefeatedSet(cmd.id, cmd.defeated))
+        }
+
+        is Command.EditCombatant -> {
+            val c = state.combatants[cmd.id]
+            val maxHp = cmd.maxHp ?: c?.maxHp ?: 0
             when {
-                pending?.stage != REACTION_WINDOW || target == null -> invalid("There is nothing to react to.")
-                !actor.controls(target) -> forbidden("Only ${target.name}'s player or the DM can skip.")
-                else -> ok(Event.ReactionSkipped)
+                !isDm -> forbidden(DM_ONLY)
+                c == null -> invalid("Unknown combatant.")
+                cmd.name != null && cmd.name.isBlank() -> invalid("Give it a name.")
+                maxHp <= 0 -> invalid("Max HP must be above 0.")
+                cmd.hp != null && cmd.hp !in 0..maxHp -> invalid("HP must be between 0 and $maxHp.")
+                cmd.ac != null && cmd.ac < 0 -> invalid("AC can't be negative.")
+                else -> ok(Event.CombatantEdited(cmd.id, cmd.name?.trim(), cmd.portraitKey, cmd.initiative, cmd.ac, cmd.hp, cmd.maxHp))
             }
         }
 
-        is SubmitDamage -> {
-            val attacker = pending?.let { state.combatant(it.attackerId) }
-            when {
-                pending?.stage != AWAITING_DAMAGE || attacker == null -> invalid("No damage is expected right now.")
-                !actor.controls(attacker) -> forbidden("Only the attacker enters damage.")
-                cmd.amount < 0 -> invalid("Damage can't be negative.")
-                // The DM's own damage needs no confirmation step.
-                attacker.controller == Controller.Dm -> ok(
-                    Event.DamageSubmitted(cmd.amount, cmd.damageType),
-                    Event.DamageApplied(pending.targetId, cmd.amount, cmd.damageType),
-                )
-                else -> ok(Event.DamageSubmitted(cmd.amount, cmd.damageType))
-            }
-        }
-
-        is ApplyDamage -> when {
-            actor != Actor.Dm -> forbidden("Only the DM applies damage.")
-            pending?.stage != DAMAGE_SUBMITTED -> invalid("There is no damage to apply.")
-            cmd.amount < 0 -> invalid("Damage can't be negative.")
-            else -> ok(Event.DamageApplied(pending.targetId, cmd.amount, pending.damageType ?: "damage"))
-        }
-
-        is UseReaction -> {
-            val c = state.combatants[cmd.combatantId] ?: return invalid("Unknown combatant.")
-            if (!actor.controls(c)) forbidden("That isn't your character.")
-            else ok(Event.ReactionUsed(c.id, cmd.label, 0, automatic = false))
-        }
-
-        is UseStandardAction -> when {
-            !actor.controls(state.current) -> forbidden("It is not your turn.")
-            pending != null -> invalid("Finish the pending attack first.")
-            else -> ok(Event.StandardActionUsed(state.currentId, cmd.label, cmd.cost))
-        }
-
-        NextTurn -> when {
-            actor != Actor.Dm && !actor.controls(state.current) -> forbidden("It is not your turn.")
-            actor != Actor.Dm && pending != null -> invalid("Finish the pending attack first.")
-            else -> {
-                val (nextId, round) = nextTurn(state)
-                ok(Event.TurnAdvanced(nextId, round))
-            }
+        is Command.Reorder -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.order.size != state.order.size || cmd.order.toSet() != state.order.toSet() ->
+                invalid("The new order must list every combatant once.")
+            else -> ok(Event.Reordered(cmd.order))
         }
     }
 }
 
-/**
- * A reaction set to AUTO_IF_TURNS_MISS fires only when its AC bonus would turn this hit into a miss.
- * Never on a natural 20.
- */
-internal fun automaticReaction(state: EncounterState, attack: PendingAttack): ReactionDef? {
-    val target = state.combatant(attack.targetId)
-    if (attack.kind != AttackKind.ATTACK || attack.natural == Natural.TWENTY) return null
-    if (target.side != Side.PARTY || target.resources.reactionUsed) return null
-    return target.reactions.firstOrNull {
-        it.mode == ReactionMode.AUTO_IF_TURNS_MISS && it.acBonus > 0 && attack.roll < target.effectiveAc + it.acBonus
-    }
+/** Players may fix their own entries during their own turn; the DM may fix anything. */
+private fun canFix(state: EncounterState, entry: AttackEntry, actor: Actor): Boolean =
+    actor == Actor.Dm ||
+        (actor.controls(state.combatant(entry.attackerId)) && state.currentId == entry.attackerId && entry.round == state.round)
+
+private fun EncounterState.takesTurns(id: CombatantId): Boolean {
+    val c = combatant(id)
+    return !c.hidden && !c.defeated
 }
 
-/** Next combatant in initiative order, skipping hidden and downed ones; the round goes up on wrap-around. */
-internal fun nextTurn(state: EncounterState): Pair<CombatantId, Int> {
-    var index = state.order.indexOf(state.currentId)
+/** Next combatant in order, skipping hidden and defeated ones; the round goes up on wrap-around. */
+internal fun nextTurn(state: EncounterState): Pair<CombatantId, Int>? {
+    if (state.order.none(state::takesTurns)) return null
+    val current = state.currentId ?: return state.order.first(state::takesTurns) to maxOf(state.round, 1)
+    var index = state.order.indexOf(current)
     var round = state.round
     repeat(state.order.size) {
         index = (index + 1) % state.order.size
         if (index == 0) round++
-        val c = state.combatant(state.order[index])
-        if (!c.hidden && !c.isDown) return c.id to round
+        val id = state.order[index]
+        if (state.takesTurns(id)) return id to round
     }
-    return state.currentId to round
+    return null
+}
+
+/** The DM stepping back a turn; the round goes down when stepping back past the top. */
+internal fun previousTurn(state: EncounterState): Pair<CombatantId, Int>? {
+    val current = state.currentId ?: return null
+    var index = state.order.indexOf(current)
+    var round = state.round
+    repeat(state.order.size) {
+        if (index == 0) {
+            if (round <= 1) return null
+            round--
+        }
+        index = (index - 1 + state.order.size) % state.order.size
+        val id = state.order[index]
+        if (state.takesTurns(id)) return id to round
+    }
+    return null
 }

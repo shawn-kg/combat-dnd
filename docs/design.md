@@ -1,168 +1,126 @@
 # Combat D&D Design Doc
 
-> Snapshot of the living design doc as of 2026-11-21. The editable version, with comments, is at
+> Snapshot of the living design doc as of 2026-11-22. The editable version, with comments, is at
 > https://claude.ai/artifact/EvjGJzwvnNzExE1oMbCCAH. Update this file when the design changes.
 
 ## Overview
 
-Combat D&D is a web app that tracks D&D 5e combat for our remote group: one DM and about 8 players, each on their own laptop. Everyone sees the same live initiative list; the DM sees everything, and players see their own options plus what their characters would know.
+Combat D&D is a live initiative tracker for our remote group: one DM and about 8 players, each on their own laptop. It works like D&D Beyond's encounter tracker. Each combatant is one row with a portrait, initiative, AC, HP out of max, and what happened on their last turn (hit or miss, and damage).
 
-Goals:
-
-- Nobody loses track of initiative, HP, conditions or whose turn it is.
-- A player's turn is a short back-and-forth with the DM: declare, DM calls it, enter damage, DM applies.
-- Turns go faster because players can see their options and plan ahead while they wait.
-- Characters carry over between sessions, and the DM can prepare encounters ahead of time.
+- **The DM runs it** and can edit everything: combatants, portraits, initiative, AC, HP, and any logged turn.
+- **Players see the tracker** and log their own turns: target, hit or miss, damage. The DM can correct any entry.
+- **Players see less than the DM.** Enemy HP and AC stay hidden, and so do enemies the DM hasn't revealed.
+- **Characters carry over** between sessions, and the DM can prepare encounters ahead of time.
 
 Players roll physical dice and type in totals. The app never rolls for anyone.
 
-The [clickable mockup](https://claude.ai/artifact/2YbcoLEwtTzEnpHRycCKpn) shows the combat screen with the DM and player views side by side.
+This replaces an earlier, much larger design with a full attack flow, reactions, conditions and turn planning. That design is in the doc's version history and in this file's git history.
 
 ## Principles
 
-These four rules decide most design questions.
-
-1. **Track, don't enforce. The DM rules.** The app records what happened and shows hints. It never blocks an action because a resource looks used. It automates only fixed numbers, like HP, AC or Shield's +5. Character builds, positioning and judgment calls are entered by players and confirmed by the DM.
-2. **Hidden information is enforced on the server.** Players never receive enemy HP, AC, private conditions or hidden combatants. The server builds a filtered view for each viewer, so nothing is hidden only in the UI.
-3. **Everything that happens is an event.** Each change is appended to an event log. The combat log, undo and audit history all come from it.
-4. **Rules are pure functions.** `decide` (may this actor do this now?) and `evolve` (apply one event) have no database or HTTP code, so every rule can be unit tested.
+1. **The DM can edit everything.** Any number, any portrait, any logged turn. Nothing a player enters is final until the DM leaves it alone.
+2. **Players see only what they should, enforced on the server.** Players never receive enemy HP, AC or hidden enemies. The server builds a filtered view for each viewer, so nothing is hidden only in the UI.
+3. **Every change is an event.** Changes go into an event log. Undo and the last-turn summaries come from it.
+4. **Keep it a tracker.** The app records what happened. It doesn't model action economy, conditions or reactions; the table handles those.
 
 ## Scope
 
-Version 1 covers one complete fight, from prep to the last hit. Later work makes it richer, not different.
-
 | Area | Version 1 | Later |
 | --- | --- | --- |
-| Campaign | Join link, DM approves players, rejoin on a new laptop | Real accounts |
-| Characters | Player-created, persistent HP, attack presets with default costs, reactions with modes | Spell slots, full sheets, level-up help |
-| Monsters | Templates with HP, AC, speed, attacks, Multiattack, reactions | Import from the free 5e SRD |
-| Encounters | Prep ahead, hidden enemies, DM notes, duplicate | Maps and positions |
-| Initiative | Players submit their own rolls, DM fills enemies and reorders | |
-| Turns | Attack and spell flow, reactions, send back, standard actions, resource tracking, undo | Multi-target spells (Fireball, Bless), concentration checks |
-| Planning | Turn plans, Ready badge, early rolls (DM setting), automatic reactions | |
-| Views | DM, player, shared feed and log | A read-only spectator link |
+| Campaign | Join link, DM approves players, each player chooses their character once | Real accounts |
+| Characters | Created by the DM: name, portrait, AC, max HP, current HP; HP carries over | Players editing their own sheet |
+| Monsters | Templates with name, portrait, AC, max HP | Import from the free 5e SRD |
+| Encounters | Prep ahead, add enemies from templates, hidden enemies, reveal | |
+| Combat | Initiative order, current turn, next and previous turn, round counter | |
+| Turns | Log attacks (target, hit or miss, damage); damage comes off the target's HP; last-turn summary per row | Healing entries, multi-target spells |
+| DM | Edit any field or log entry, undo, reorder, add, remove, reveal | |
+
+Removed from the earlier design: the DM-confirmed attack flow, reactions, send back, advantage and natural 20 toggles, action and bonus tracking, conditions, hints and turn planning.
 
 ## User flows
 
-### Joining a campaign
+### Joining and choosing a character
 
-1. The DM creates a campaign and shares the join link (e.g. `/join/K7QX2`) in the group chat.
-2. A player opens the link, types a name, and waits in a lobby.
-3. The DM approves or denies. Approval sets a cookie in that browser.
-4. On a new laptop, the player opens the same link, picks "I'm returning as…", and the DM approves again.
+1. The DM creates the campaign and its characters, then shares the join link (e.g. `/join/K7QX2`).
+2. A player opens the link, types their name and waits in a lobby.
+3. The DM approves them.
+4. The player picks their character from the ones nobody has claimed yet. This happens once: from then on that character is theirs, and their row shows a "You" tag.
+5. On a new laptop, the player opens the link, picks "I'm returning as…", and the DM approves again. Their character comes with them.
 
-The DM can remove a player or regenerate the join code.
+The DM can unassign a character (if someone picked the wrong one), remove a player, or regenerate the join code.
 
-### Characters
+### Portraits
 
-Players create their own characters: name, max HP, AC, speed, initiative bonus, attack presets and reactions. The DM can edit any character, create one for a player, or create DM-controlled NPC allies. HP lives on the character, so damage carries over between fights and sessions.
+The DM uploads a picture for each character and monster template. It's cropped to a square and shown as a circle. Without a picture, the row shows the name's initials on a party or enemy colored background.
 
-### Encounter prep and starting combat
+### Encounter prep
 
-1. Before the session, the DM builds encounters: enemies from templates ("Goblin × 4" becomes Goblin 1–4), one-off enemies, hidden reinforcements, DM-only notes and optionally pre-rolled enemy initiative.
-2. At the table, the DM presses **Start combat**. Every active party member is added.
-3. Each player's screen asks for their initiative roll. The DM fills in any missing enemy rolls.
-4. The DM presses **Begin round 1**. The list sorts by initiative, and the DM can drag to break ties.
+Before the session, the DM builds encounters: enemies from templates ("Goblin × 4" becomes Goblin 1–4, each with the template's portrait, AC and HP), one-off enemies, and hidden reinforcements. Initiative can be typed in ahead of time.
 
-The DM can add or reveal combatants at any point during the fight.
+### Running combat
 
-### A turn
+1. The DM starts the encounter. Every party character is added.
+2. The DM types each initiative and the list sorts itself. The DM can drag to break ties.
+3. The current turn's row is highlighted for everyone. **Next turn** and **Previous turn** move it; the round counts up on wrap-around.
+4. During the fight the DM can add enemies, reveal hidden ones, remove or mark defeated, and edit any field inline.
 
-The current combatant's bubble expands for everyone. Only its controller and the DM get the controls.
+### Logging a turn
 
-- **Attack** or **Spell**: pick a preset (it fills in what it uses), pick a target from the grouped list or by clicking a bubble, choose Normal, Advantage or Disadvantage, flag a natural 20 or 1, and enter the roll.
-- **More actions**: Dash, Disengage, Dodge, Help, Hide, Ready, Search, Use an Object, plus the character's own options such as Second Wind.
-- Action, Bonus action, Reaction and movement mark themselves from declarations. Clicking them is only for corrections.
-- **End turn**: the player ends their own turn. The DM can always go to the next or previous turn.
+On their turn, a player presses **Log attack** on their row:
 
-### The attack flow
+1. Pick the target from a list (enemies first).
+2. Choose **Hit** or **Miss**.
+3. On a hit, type the damage. It comes off the target's HP right away.
 
-1. **Declared**: the DM sees the roll against the target's AC, condition hints, and any enemy reaction (for example Parry +2 AC).
-2. The DM picks **Hit**, **Miss** or **Send back** (with a reason, such as "Roll with disadvantage").
-3. **Reaction window**: on a hit against a party member who still has a reaction, that player is asked whether to react. Shield recalculates and can turn the hit into a miss. The DM can skip the window.
-4. **Damage**: the attacker enters the total and type. A natural 20 reminds them to roll the dice twice. On enemy attacks, the DM's entry applies directly.
-5. **Confirm**: the DM can adjust the number, then applies it or sends it back.
-
-```mermaid
-flowchart LR
-    Declared -- "DM: hit" --> RW[Reaction window]
-    Declared -- "DM: miss" --> Missed
-    Declared -- "send back, new roll" --> Declared
-    RW -- "react or take it" --> AD[Awaiting damage]
-    RW -- "Shield makes it a miss" --> Missed
-    AD -- "attacker enters" --> DS[Damage submitted]
-    DS -- "DM: send back" --> AD
-    DS -- "DM applies" --> Applied
-```
-
-A miss or a Shield ends the attack early. A send-back returns the step to the attacker without losing the thread. The reaction window is skipped when the target has no reaction left or every reaction is set to Never ask.
-
-At any time outside your turn, **Use reaction** on your own bubble logs an opportunity attack or a similar reaction.
-
-### Planning a turn
-
-While waiting, a player opens **Plan my turn**:
-
-- Options are grouped by Action, Bonus and Free and added to the plan in order.
-- Each step gets a target and, if the DM allows early rolls, a roll and roll mode.
-- **Mark ready** shows a Ready badge to everyone. Only the owner sees the plan itself.
-- Each reaction gets a mode: Always ask, Never ask, or Use it when it turns a hit into a miss (never on a natural 20).
-
-When the turn starts, the plan becomes a checklist. A step with an early roll is one click; one without opens the composer prefilled. If a target has dropped, the step warns instead of failing. The DM still calls every hit. A plan clears when the turn ends.
+They can log several attacks in one turn. The row's last-turn line sums them up, for example "Hit Goblin 2 · 9 damage" or "2 hits, 1 miss · 17 damage". The DM logs enemy turns the same way. The DM can edit or delete any entry, and the target's HP is corrected to match.
 
 ## Data model
 
-Postgres is the single source of truth. The server caches each active encounter in memory and rebuilds it from its events when needed. The full schema is in `backend/src/main/resources/db/migration/V1__init.sql`.
+Postgres holds everything except image files, which go to object storage. The server caches each active encounter in memory and rebuilds it from its events when needed. The schema is in `backend/src/main/resources/db/migration/V1__init.sql`.
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `campaign` | name, join_code, dm_token_hash, allow_early_rolls | One per group |
-| `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords in version 1 |
-| `character` | player_id (null = DM-controlled), name, kind (PC, NPC), max_hp, current_hp, temp_hp, ac, speed, initiative_bonus, conditions, attacks_per_action, attack_presets, reactions | HP lives here so it carries over |
-| `monster_template` | name, max_hp, ac, speed, initiative_bonus, attack_presets, multiattack, reactions, notes | Reused across encounters |
-| `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), round, current_combatant_id, version, notes, auto_add_party | `version` guards against conflicting edits |
-| `combatant` | encounter_id, side (PARTY, ENEMY, NEUTRAL), character_id or monster_template_id, name, initiative, sort_order, hp and ac (monsters only), conditions, hidden, defeated, ac_bonus, action_used, bonus_used, reaction_used, movement_used, dashed, attacks_this_turn | One row per participant |
-| `encounter_event` | encounter_id, seq, actor_role, actor_id, type, payload, undone, created_at | Append-only log |
-| `turn_plan` | encounter_id, combatant_id, steps, note, ready, updated_at | Outside the event log on purpose |
+| `campaign` | name, join_code, dm_token_hash | One per group |
+| `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords |
+| `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
+| `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |
+| `encounter` | name, status (PREPARING, ACTIVE, ENDED), round, current_combatant_id, version | `version` guards against conflicting edits |
+| `combatant` | encounter_id, side (PARTY, ENEMY), character_id or monster_template_id, name, portrait_key, initiative, sort_order, ac and hp (enemies only), hidden, defeated | One row per participant |
+| `encounter_event` | encounter_id, seq, actor, type, payload, undone, created_at | Append-only; attacks, edits and turn changes |
 
-Shapes stored as JSON:
+`portrait_key` names a file in object storage. A player's character is set once, when `character.player_id` is filled; only the DM can change it after that.
 
-- **Attack preset**: `{name, kind: ATTACK | SPELL | OTHER, defaultCost: ACTION | BONUS | REACTION | FREE, note}`, e.g. Shortsword, Free, "Nick".
-- **Reaction**: `{name, acBonus?, halveDamage?, mode: ASK | NEVER | AUTO_IF_TURNS_MISS}`.
-- **Condition**: `{name, private}`. Private conditions are only meaningful on enemies.
-- **Plan step**: `{kind, label, cost, note, targetId, roll, rollMode, status}`.
+A combatant's **last turn** is not stored as a column. It is every `AttackLogged` event that combatant made during its most recent turn, minus any deleted ones. That way editing or undoing an attack updates the summary and the HP together.
 
 ### What each viewer receives
 
 | Data | DM | Player |
 | --- | --- | --- |
-| Party HP, AC, conditions, resources | Yes | Yes |
-| Enemy name and initiative | Yes | Yes |
-| Enemy HP, AC, attacks | Yes | Never sent |
-| Enemy conditions | All | Public ones only |
-| Hidden combatants | Yes | Not until revealed |
+| Portrait, name, initiative, whose turn, round | Yes | Yes |
+| Party AC and HP | Yes | Yes |
+| Enemy AC and HP | Yes | Never sent |
+| Last-turn summary (hit or miss, damage) | Yes | Yes |
+| Hidden enemies | Yes | Not until revealed |
 | Defeated enemies | Yes | Shown greyed out |
-| Enemy reactions in the log | Name and AC change | Name only |
-| Turn plans | Ready flag only | Own plan in full; others' Ready flag |
+| Edit controls | Everything | Log attacks on their own turn |
 
 ## Backend
 
 The backend is Kotlin on Spring Boot 4 (Spring MVC, Java 21 virtual threads), with Spring JDBC and Flyway on Postgres. Commands come in over REST, and updates go out over Server-Sent Events (SSE).
 
-### Combat rules
+### Tracker rules
 
 ```kotlin
 fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision
 fun evolve(state: EncounterState, event: Event): EncounterState
 fun viewFor(state: EncounterState, viewer: Actor): EncounterView
-fun hintsFor(attacker: Combatant, target: Combatant, viewer: Actor): List<Hint>
 ```
 
-- `decide` checks only structure: whose turn it is, what is pending, who controls which combatant. It never checks resource limits.
+- `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn.
 - Current state is `events.fold(initial, ::evolve)`. Undo marks the last event undone and replays.
-- Commands: `DeclareAttack` (preset, target, cost, cost note, roll, roll mode, natural, early), `ResolveAttack`, `EnemyReact`, `SendBack`, `Resubmit`, `React`, `SkipReaction`, `SubmitDamage`, `ApplyDamage`, `UseReaction`, `UseStandardAction`, `UseResource`, `SetCondition`, `EditCombatant`, `Reorder`, `AddCombatant`, `RevealCombatant`, `StartInitiative`, `SubmitInitiative`, `BeginCombat`, `NextTurn`, `PreviousTurn`, `Undo`.
-- Attack states: `DECLARED`, `RESUBMIT`, `REACTION_WINDOW`, `AWAITING_DAMAGE`, `DAMAGE_SUBMITTED`, then `APPLIED` or `MISSED`.
-- Automatic reactions: when the DM calls a hit, `decide` also emits the target's `AUTO_IF_TURNS_MISS` reaction if its AC bonus would turn the hit into a miss and the roll is not a natural 20. `evolve` then applies it like any other reaction.
+- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
+- `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
+- Party HP is written back to `character.current_hp`, so it carries over to the next fight.
 
 ### API
 
@@ -172,136 +130,93 @@ fun hintsFor(attacker: Combatant, target: Combatant, viewer: Actor): List<Hint>
 | `POST /api/campaigns/join` | Join or rejoin with the code |
 | `GET /api/campaigns/{id}/lobby/stream` | SSE so a waiting player sees approval at once |
 | `POST /api/campaigns/{id}/players/{pid}/approve`, `/deny`, `/remove` | DM manages players |
-| `POST /api/campaigns/{id}/join-code/rotate` | New join code |
-| `GET, POST, PUT, DELETE /api/campaigns/{id}/characters` and `/monster-templates` | CRUD |
-| `POST /api/campaigns/{id}/encounters`, `/encounters/{id}/duplicate` | Prep |
-| `POST /api/encounters/{id}/combatants`, `/combatants/party` | Add combatants |
-| `POST /api/encounters/{id}/commands` | Every combat command, with `expectedVersion` |
-| `GET /api/encounters/{id}/state` | This viewer's filtered state |
-| `GET /api/encounters/{id}/stream` | SSE: the filtered state after every change |
-| `GET, PUT /api/encounters/{id}/plans/{combatantId}` | Turn plans (plain CRUD, no version bump) |
+| `POST /api/campaigns/{id}/characters/{cid}/claim` | A player chooses their character (once) |
+| `GET, POST, PUT, DELETE /api/campaigns/{id}/characters` and `/monster-templates` | DM CRUD |
+| `POST /api/campaigns/{id}/images` | DM uploads a portrait; returns its key |
+| `POST /api/campaigns/{id}/encounters` | Prep |
+| `POST /api/encounters/{id}/commands` | Every tracker command, with `expectedVersion` |
+| `GET /api/encounters/{id}/stream` | SSE: this viewer's filtered tracker after every change |
 
 ### Request lifecycle
 
 1. Resolve the actor from the cookie.
 2. Lock the encounter (one in-memory lock per encounter).
 3. Reject with 409 if `expectedVersion` is stale.
-4. Run `decide`; reject with 400 or 403 and a reason.
-5. In one transaction, insert the events, bump the version and write character HP.
-6. Fold the events into the cached state, unlock, then broadcast.
+4. Run `decide`; reject with 403 and a reason.
+5. In one transaction, insert the events, bump the version and write party HP.
+6. Fold the events into the cached state, unlock, then send each viewer their filtered snapshot.
 
-Broadcasting computes `viewFor` once per viewer and sends the whole snapshot (a few KB), so the client never merges diffs. A 15-second heartbeat keeps connections open through proxies, and the browser reconnects on its own.
-
-This design assumes one server instance. If that ever changes, Postgres `LISTEN/NOTIFY` can fan out broadcasts without changing the rest.
+Image uploads are limited to 5 MB, JPEG, PNG or WebP, and resized to 256 × 256 on the server before storing. Portraits are served through short-lived signed URLs.
 
 ## Frontend
 
-The frontend is one React app, served by Spring as static files, so there is a single deployable and no cross-origin cookie problems.
-
-| Concern | Choice |
-| --- | --- |
-| Build | Vite, React, TypeScript |
-| Routing | React Router |
-| API types and client | Generated from Spring's OpenAPI spec with openapi-typescript and openapi-fetch |
-| CRUD pages | TanStack Query |
-| Live combat state | A `useEncounter` hook over `EventSource` |
-| Components | Tailwind and shadcn/ui (Radix), restyled to our design tokens |
-| Drag to reorder | dnd-kit (DM only) |
+One React app (Vite, TypeScript, React Router, TanStack Query), served by Spring as static files.
 
 ### Routes
 
-- `/join/:code`: join or rejoin, then the lobby.
-- `/c/:campaignId`: campaign home. The DM manages players, characters, templates and encounters; players manage their characters and join the active fight.
+- `/join/:code`: join or rejoin, the lobby, then choosing a character.
+- `/c/:campaignId`: campaign home. The DM manages players, characters, templates, portraits and encounters.
 - `/c/:campaignId/encounters/:id`: encounter prep (DM).
-- `/combat/:id`: the combat screen, rendered by role.
+- `/combat/:id`: the tracker, rendered by role.
 
-### Combat screen components
+### Tracker components
 
-- `CombatHeader`: round, whose turn, and DM controls (previous, next, undo, early rolls, end combat).
-- `InitiativeFeed` of `CombatantBubble`s: enemies left, party right, in initiative order. Collapsed bubbles show HP and AC where visible, conditions, Ready and reaction status.
-- `TurnPanel` (the current bubble, expanded): `ResourceBar`, `TurnThread`, `InteractionCard`, `PlanChecklist` and `ActionComposer` with `TargetPicker` (grouped, filterable, last target first).
-- `PlanEditor` on your own bubble outside your turn.
-- `ReactionPrompt`, `InitiativePhase`, and a `DmDrawer` for adding, revealing and editing.
+- `TrackerHeader`: encounter name, round, whose turn; DM gets Previous, Next, Undo, Add enemy.
+- `TrackerRow`: portrait, initiative, name, AC, HP bar with numbers, last-turn line. The DM's row has inline editing on every field and a menu with Reveal, Mark defeated and Remove.
+- `LogAttackDialog`: target list, Hit or Miss, damage. Opens from your own row on your turn, and from any row for the DM.
+- `TurnLog` (DM): the current and previous turns' entries, each with Edit and Delete.
 
-### State
-
-The screen renders purely from the latest snapshot. Commands are sent with the snapshot's version, with no optimistic updates: a round trip takes around 100 ms. A 409 shows "The table changed. Check and try again." A 400 or 403 shows the server's reason inline. Rules live only on the server; the client only shows hints that the server computed.
+The screen renders from the latest snapshot the server pushed; there are no optimistic updates.
 
 ## Visual design
 
-The layout and interactions are a modern chat app; the fantasy shows only in type, color and a few ornaments. Dark is the default, with a light theme toggle. The [mockup](https://claude.ai/artifact/2YbcoLEwtTzEnpHRycCKpn) is the reference, and the tokens live in `frontend/src/styles/tokens.css`.
+The tracker is one list of rows in initiative order, like D&D Beyond. Dark is the default, with a light theme. The fantasy shows only in the type (Cinzel for names and headings) and a gold highlight on the current turn.
 
-| Token | Dark | Light | Used for |
-| --- | --- | --- | --- |
-| bg | #14161B | #F3EDE0 | Page |
-| surface | #1C1F26 | #FBF8F1 | Panels, collapsed bubbles |
-| text | #ECE6D8 | #2A2620 | Body text |
-| gold | #D4A64A | #9E7418 | Current turn, primary buttons, DM label |
-| party | #3F8C96 on #1B3239 | #2A6C75 on #DDEBEC | Party bubbles (right) |
-| enemy | #B5473D on #361E21 | #9E3A31 on #F3E0DB | Enemy bubbles (left) |
-| react | #A18FD8 | #6550A8 | Reactions |
-| HP high, mid, low | #6DBE7A, #E0A33A, #D9534F | #3B8A4A, #B07610, #B73A35 | HP bars, hits, damage |
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ 21  (◯) Goblin Boss        AC 15   22/30 ▓▓▓▓▓░░   Hit Thorin · 6 │  enemy: red edge
+┃ 15  (◯) Lyra  YOU  ▸TURN  AC 15   22/27 ▓▓▓▓▓▓░   2 hits · 17    ┃  current: gold
+│ 12  (◯) Goblin 1           —        —               Miss            │  player view of an enemy
+└────────────────────────────────────────────────────────────────────┘
+```
 
-- **Type**: Cinzel only for the logo, names and round dividers; Inter for everything else, with tabular numbers.
-- **Feed**: one column in initiative order. Bubbles are at most 72% wide with one flat corner on their side. The current turn has a gold border and glow and expands to show its thread.
-- **Side is never shown by color alone**: alignment plus a shield or skull icon.
-- **Action economy by shape**: ● Action, ▲ Bonus, ■ Reaction. A used resource is dimmed and struck through.
-- **Thread**: player messages on the right, DM messages on the left with a gold DM tag, damage as a large red number, pending steps as a card with a gold edge.
-- **Motion**: about 200 ms expands, new messages rise in, a short shake on damage; all off under reduced motion.
-- **DM shortcuts**: H hit, M miss, Enter apply, N next turn, U undo.
-
-"D&D" is a Wizards of the Coast trademark. The name is fine for a private group app; rename it before any public release.
+- **Portrait**: a 48 px circle, with a party (teal) or enemy (red) ring. Initials when there's no picture.
+- **Side**: a colored left edge plus the ring color, never color alone; party and enemies keep a shield or skull icon.
+- **HP**: numbers plus a bar that turns amber below 50% and red below 25%. Players see a dash for enemy AC and HP.
+- **Last turn**: "Hit Goblin 2 · 9", "Miss", or "2 hits, 1 miss · 17". Hits in green, misses muted, damage in red.
+- **Current turn**: gold border and glow; the list scrolls to it on each turn change.
+- **Defeated**: greyed out with a strikethrough. **Hidden** (DM only): dashed border and an eye-off icon.
+- The color tokens from the earlier design stay the same (`frontend/src/styles/tokens.css`).
 
 ## Infrastructure
 
-One Docker image runs on one Fly.io machine with Neon Postgres, for an estimated $5–7 a month. Prices are approximate; check current pricing before committing.
+One Docker image on one Fly.io machine, Neon Postgres, and Cloudflare R2 for portraits, for an estimated $5–7 a month. Prices are approximate; check current pricing before committing.
 
 | Piece | Choice | Approximate cost |
 | --- | --- | --- |
-| App | Fly.io, 1 shared-CPU machine with 1 GB RAM, in the region nearest the group | $5–7/month |
+| App | Fly.io, 1 shared-CPU machine with 1 GB RAM | $5–7/month |
 | Database | Neon serverless Postgres | Free tier |
+| Portraits | Cloudflare R2 (S3-compatible), 256 × 256 images of a few KB each | Free tier |
 | Domain | `combat-dnd.fly.dev` with TLS included | $0 |
-| Errors | Sentry, frontend and backend | Free tier |
-| Backups | Nightly `pg_dump` to Cloudflare R2, kept 30 days | Free tier |
+| Backups | Nightly `pg_dump` to R2, kept 30 days | Free tier |
 
-Railway is the fallback if we'd rather manage everything from a dashboard; the same Docker image runs there.
-
-### Build and deploy
-
-- The Dockerfile has three stages: Node builds the frontend, Gradle builds the jar with the frontend in `static/`, and the image runs on a Java 21 JRE.
-- Flyway migrations run when the app starts.
-- GitHub Actions on every pull request: backend tests, frontend lint and build. Planned: Testcontainers Postgres tests and a check that the generated API types are up to date.
-- On merge to main: build the image and `flyctl deploy` (commented out in `ci.yml` until the Fly app exists).
-- Locally: `docker compose up` for Postgres, `./gradlew bootRun`, and `npm run dev` with `/api` proxied to Spring.
-
-### Settings that matter
-
-- Exactly one machine (`fly scale count 1`), always running (`min_machines_running = 1`), because state, locks and SSE connections live in memory.
-- SSE: 15-second heartbeat and no response buffering on the stream endpoint.
-- A deploy restarts the server. Browsers reconnect within seconds and state is rebuilt from events, but the blip is visible, so don't deploy mid-session.
-
-### Security
-
-- Tokens are 32 random bytes, stored hashed. Cookies are `HttpOnly; Secure; SameSite=Lax`.
-- Every POST requires an `X-Requested-With` header against CSRF.
-- The join endpoint is rate limited, on top of DM approval.
-- Secrets go in `fly secrets`, never in the repo.
+- **Build:** a three-stage Dockerfile (Node builds the frontend, Gradle builds the jar with it inside, a Java 21 JRE runs it). Flyway migrates on startup.
+- **CI:** GitHub Actions runs backend tests and frontend lint and build on every push and pull request. Deploy on merge to main is ready in `ci.yml`, commented out until the Fly app exists.
+- **One machine, always running,** because the encounter cache and SSE connections live in memory. Don't deploy mid-session.
+- **Locally:** `docker compose up` starts Postgres, portraits are saved to a local folder instead of R2, then `./gradlew bootRun` and `npm run dev`.
+- **Security:** tokens are 32 random bytes, stored hashed, in `HttpOnly; Secure; SameSite=Lax` cookies; POSTs require an `X-Requested-With` header; the join endpoint is rate limited; R2 credentials live in `fly secrets`.
 
 ## Roadmap and open questions
 
-Build order, each step usable on its own:
-
-1. Repo scaffold: Gradle backend, Vite frontend, Docker image, CI, the database schema. **Done.**
-2. Combat rules: `decide`, `evolve`, `viewFor` and `hintsFor`, with unit tests. **Mostly done**; still to add: undo, initiative phase, HP and condition edits, add and reveal combatants, previous turn.
-3. Encounter service and API: commands, version checks, persistence, SSE.
-4. Combat screen: the feed, turn panel, attack flow and DM controls.
-5. Campaign, join and lobby, characters, monster templates, encounter prep, initiative phase.
-6. Turn planning and reaction modes.
-7. Deploy to Fly.io and run a test session with the group.
+1. **Rework the repo for the tracker.** Replace the attack-flow rules with the tracker rules and tests, and update the schema. In progress.
+2. Tracker API: persistence, version checks, SSE.
+3. Tracker screen: rows, DM inline editing, Log attack, turn log.
+4. Campaign, join, lobby and choosing a character; characters and templates; portrait uploads.
+5. Encounter prep.
+6. Deploy to Fly.io and run a test session with the group.
 
 Open questions:
 
-- [ ] Should multi-target spells (Fireball, Bless) be in version 1? They need a checkbox target list and a per-target save on the DM's card.
-- [ ] Should early rolls default to on or off for a new campaign?
-- [ ] What should players see when an enemy is hidden but attacks them?
-- [ ] Do we want concentration tracking soon after version 1?
+- [ ] Should players see a health band for enemies (Healthy, Bloodied, Down) instead of nothing?
+- [ ] Should healing be logged like attacks, so the last-turn line can say "Healed Bram · 7"?
+- [ ] Should players type their own initiative at the start of combat, or is DM entry enough?

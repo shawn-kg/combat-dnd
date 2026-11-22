@@ -18,30 +18,14 @@ private val GOB1 = CombatantId("gob1")
 private val ARCHER = CombatantId("archer")
 private val BRAM = CombatantId("bram")
 
-/** The goblin ambush from the mockup, starting on Lyra's turn in round 3. */
-private fun ambush(
-    shieldMode: ReactionMode = ReactionMode.ASK,
-    current: CombatantId = LYRA,
-): EncounterState {
+/** A goblin ambush in round 3, on Lyra's turn. */
+private fun ambush(current: CombatantId? = LYRA): EncounterState {
     val cs = listOf(
-        Combatant(
-            BOSS, "Goblin Boss", Side.ENEMY, Controller.Dm, initiative = 21, hp = 22, maxHp = 30, ac = 15,
-            reactions = listOf(ReactionDef("Parry", acBonus = 2)), attacksPerAction = 2,
-            conditions = listOf(Condition("Frightened")),
-        ),
-        Combatant(
-            LYRA, "Lyra", Side.PARTY, Controller.Player(LYRA_PLAYER), initiative = 15, hp = 22, maxHp = 27, ac = 15,
-            reactions = listOf(ReactionDef("Shield", acBonus = 5, mode = shieldMode)), attacksPerAction = 2,
-        ),
-        Combatant(
-            GOB1, "Goblin 1", Side.ENEMY, Controller.Dm, initiative = 12, hp = 7, maxHp = 7, ac = 13,
-            conditions = listOf(Condition("Prone"), Condition("Poisoned", private = true)),
-        ),
-        Combatant(ARCHER, "Goblin Archer", Side.ENEMY, Controller.Dm, initiative = 11, hp = 9, maxHp = 9, ac = 14, hidden = true),
-        Combatant(
-            BRAM, "Bram", Side.PARTY, Controller.Player(BRAM_PLAYER), initiative = 9, hp = 19, maxHp = 31, ac = 16,
-            conditions = listOf(Condition("Poisoned")),
-        ),
+        Combatant(BOSS, "Goblin Boss", Side.ENEMY, Controller.Dm, initiative = 21, ac = 15, hp = 22, maxHp = 30, portraitKey = "img/boss.webp"),
+        Combatant(LYRA, "Lyra", Side.PARTY, Controller.Player(LYRA_PLAYER), initiative = 15, ac = 15, hp = 22, maxHp = 27),
+        Combatant(GOB1, "Goblin 1", Side.ENEMY, Controller.Dm, initiative = 12, ac = 13, hp = 7, maxHp = 7),
+        Combatant(ARCHER, "Goblin Archer", Side.ENEMY, Controller.Dm, initiative = 11, ac = 14, hp = 9, maxHp = 9, hidden = true),
+        Combatant(BRAM, "Bram", Side.PARTY, Controller.Player(BRAM_PLAYER), initiative = 9, ac = 16, hp = 19, maxHp = 31),
     )
     return EncounterState(round = 3, order = cs.map { it.id }, currentId = current, combatants = cs.associateBy { it.id })
 }
@@ -55,241 +39,193 @@ private fun EncounterState.run(vararg steps: Pair<Actor, Command>): EncounterSta
         }
     }
 
-private fun attack(target: CombatantId, roll: Int, natural: Natural? = null, cost: Cost = Cost.ACTION) =
-    Command.DeclareAttack(target, "Scimitar", cost = cost, roll = roll, natural = natural)
+private fun hit(attacker: CombatantId, target: CombatantId, damage: Int) = Command.LogAttack(attacker, target, hit = true, damage = damage)
+private fun miss(attacker: CombatantId, target: CombatantId) = Command.LogAttack(attacker, target, hit = false)
 
-class AttackFlowTest {
+class LoggingTest {
     @Test
-    fun `player attack goes declare, hit, damage, DM applies`() {
-        val s = ambush().run(
-            lyraActor to attack(BOSS, roll = 18),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.SubmitDamage(9, "slashing"),
-        )
-        assertEquals(AttackStage.DAMAGE_SUBMITTED, s.pending?.stage)
-
-        val applied = s.run(Actor.Dm to Command.ApplyDamage(10)) // DM adjusted it
-        assertEquals(12, applied.combatant(BOSS).hp)
-        assertNull(applied.pending)
+    fun `a hit takes the damage off the target's HP`() {
+        val s = ambush().run(lyraActor to hit(LYRA, BOSS, 9))
+        assertEquals(13, s.combatant(BOSS).hp)
     }
 
     @Test
-    fun `a miss ends the attack`() {
-        val s = ambush().run(lyraActor to attack(BOSS, roll = 8), Actor.Dm to Command.ResolveAttack(hit = false))
-        assertNull(s.pending)
+    fun `a miss changes nothing and records no damage`() {
+        val s = ambush().run(lyraActor to Command.LogAttack(LYRA, BOSS, hit = false, damage = 9))
         assertEquals(22, s.combatant(BOSS).hp)
+        assertEquals(0, s.attacks.single().damage)
     }
 
     @Test
-    fun `only the DM calls hits`() {
-        val s = ambush().run(lyraActor to attack(BOSS, roll = 18))
-        val d = decide(s, Command.ResolveAttack(hit = true), lyraActor)
-        assertIs<Decision.Rejected>(d)
-        assertEquals(Reason.FORBIDDEN, d.reason)
+    fun `HP never goes below 0`() {
+        val s = ambush().run(lyraActor to hit(LYRA, GOB1, 12))
+        assertEquals(0, s.combatant(GOB1).hp)
     }
 
     @Test
-    fun `players cannot act on someone else's turn`() {
-        val d = decide(ambush(), attack(BOSS, roll = 18), bramActor)
-        assertIs<Decision.Rejected>(d)
+    fun `players log attacks only for their own character on its turn`() {
+        assertIs<Decision.Rejected>(decide(ambush(), hit(BRAM, BOSS, 5), bramActor)) // not Bram's turn
+        assertIs<Decision.Rejected>(decide(ambush(), hit(LYRA, BOSS, 5), bramActor)) // not Bram's character
+        assertIs<Decision.Rejected>(decide(ambush(), hit(LYRA, ARCHER, 5), lyraActor)) // hidden target
     }
 
     @Test
-    fun `players cannot target hidden enemies`() {
-        val d = decide(ambush(), attack(ARCHER, roll = 18), lyraActor)
-        assertIs<Decision.Rejected>(d)
-    }
-
-    @Test
-    fun `send back returns the roll to the attacker, who resubmits`() {
-        val s = ambush().run(
-            lyraActor to attack(BOSS, roll = 18),
-            Actor.Dm to Command.SendBack("Roll with disadvantage"),
-        )
-        assertEquals(AttackStage.RESUBMIT, s.pending?.stage)
-        assertEquals("Roll with disadvantage", s.pending?.sendBackReason)
-
-        val again = s.run(lyraActor to Command.Resubmit(11, RollMode.DISADVANTAGE))
-        assertEquals(AttackStage.DECLARED, again.pending?.stage)
-        assertEquals(11, again.pending?.roll)
-        assertNull(again.pending?.sendBackReason)
-    }
-
-    @Test
-    fun `DM can send damage back for a crit`() {
-        val s = ambush().run(
-            lyraActor to attack(BOSS, roll = 20, natural = Natural.TWENTY),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.SubmitDamage(7, "slashing"),
-            Actor.Dm to Command.SendBack("Critical hit: double the dice"),
-        )
-        assertEquals(AttackStage.AWAITING_DAMAGE, s.pending?.stage)
-    }
-
-    @Test
-    fun `enemy Parry raises AC before the DM calls it`() {
-        val s = ambush().run(lyraActor to attack(BOSS, roll = 16), Actor.Dm to Command.EnemyReact("Parry"))
-        assertEquals(17, s.combatant(BOSS).effectiveAc)
-        assertTrue(s.combatant(BOSS).resources.reactionUsed)
-        assertEquals(AttackStage.DECLARED, s.pending?.stage) // the DM still decides
-    }
-
-    @Test
-    fun `the DM's damage applies without a confirmation step`() {
-        val s = ambush(current = GOB1).run(
-            Actor.Dm to attack(LYRA, roll = 22),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.SkipReaction,
-            Actor.Dm to Command.SubmitDamage(5, "slashing"),
-        )
-        assertEquals(17, s.combatant(LYRA).hp)
-        assertNull(s.pending)
+    fun `the DM can log for anyone at any time`() {
+        val s = ambush().run(Actor.Dm to hit(GOB1, BRAM, 4), Actor.Dm to hit(BRAM, GOB1, 3))
+        assertEquals(15, s.combatant(BRAM).hp)
+        assertEquals(4, s.combatant(GOB1).hp)
     }
 }
 
-class ReactionTest {
-    private fun goblinHitsLyra(shieldMode: ReactionMode, roll: Int, natural: Natural? = null) =
-        ambush(shieldMode, current = GOB1).run(
-            Actor.Dm to attack(LYRA, roll = roll, natural = natural),
-            Actor.Dm to Command.ResolveAttack(hit = true),
+class LastTurnTest {
+    @Test
+    fun `the last turn sums every attack from the latest round`() {
+        val s = ambush().run(
+            lyraActor to hit(LYRA, BOSS, 9),
+            lyraActor to hit(LYRA, BOSS, 8),
+            lyraActor to miss(LYRA, GOB1),
         )
-
-    @Test
-    fun `the reaction window opens after the hit, not before`() {
-        val declared = ambush(current = GOB1).run(Actor.Dm to attack(LYRA, roll = 17))
-        assertEquals(AttackStage.DECLARED, declared.pending?.stage)
-
-        val hit = declared.run(Actor.Dm to Command.ResolveAttack(hit = true))
-        assertEquals(AttackStage.REACTION_WINDOW, hit.pending?.stage)
+        val row = viewFor(s, lyraActor).combatants.single { it.id == LYRA }.lastTurn
+        assertNotNull(row)
+        assertEquals(2, row.hits)
+        assertEquals(1, row.misses)
+        assertEquals(17, row.damage)
     }
 
     @Test
-    fun `Shield turns a close hit into a miss`() {
-        val s = goblinHitsLyra(ReactionMode.ASK, roll = 17).run(lyraActor to Command.React("Shield"))
-        assertNull(s.pending)
-        assertEquals(20, s.combatant(LYRA).effectiveAc)
+    fun `an older round is replaced once the combatant logs in a newer one`() {
+        val round3 = ambush().run(lyraActor to hit(LYRA, BOSS, 9))
+        val round4 = round3.copy(round = 4).run(lyraActor to miss(LYRA, GOB1))
+        val last = round4.lastTurn(LYRA)
+        assertEquals(1, last.size)
+        assertEquals(4, last.single().round)
     }
 
     @Test
-    fun `Shield that is not enough still lets the hit through`() {
-        val s = goblinHitsLyra(ReactionMode.ASK, roll = 23).run(lyraActor to Command.React("Shield"))
-        assertEquals(AttackStage.AWAITING_DAMAGE, s.pending?.stage)
-    }
-
-    @Test
-    fun `automatic Shield fires only when it changes the outcome`() {
-        assertNull(goblinHitsLyra(ReactionMode.AUTO_IF_TURNS_MISS, roll = 17).pending)
-
-        val tooHigh = goblinHitsLyra(ReactionMode.AUTO_IF_TURNS_MISS, roll = 23)
-        assertEquals(AttackStage.AWAITING_DAMAGE, tooHigh.pending?.stage)
-        assertTrue(!tooHigh.combatant(LYRA).resources.reactionUsed)
-    }
-
-    @Test
-    fun `automatic Shield never fires on a natural 20`() {
-        val s = goblinHitsLyra(ReactionMode.AUTO_IF_TURNS_MISS, roll = 20, natural = Natural.TWENTY)
-        assertEquals(AttackStage.AWAITING_DAMAGE, s.pending?.stage)
-    }
-
-    @Test
-    fun `Never ask skips the window`() {
-        val s = goblinHitsLyra(ReactionMode.NEVER, roll = 17)
-        assertEquals(AttackStage.AWAITING_DAMAGE, s.pending?.stage)
-    }
-
-    @Test
-    fun `a used reaction skips the window`() {
-        val s = ambush(current = GOB1).run(
-            lyraActor to Command.UseReaction(LYRA, "Opportunity attack"),
-            Actor.Dm to attack(LYRA, roll = 17),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-        )
-        assertEquals(AttackStage.AWAITING_DAMAGE, s.pending?.stage)
-    }
-
-    @Test
-    fun `only the target's player can react`() {
-        val s = goblinHitsLyra(ReactionMode.ASK, roll = 17)
-        assertIs<Decision.Rejected>(decide(s, Command.React("Shield"), bramActor))
+    fun `a combatant that never attacked has no last turn`() {
+        assertNull(viewFor(ambush(), Actor.Dm).combatants.single { it.id == BRAM }.lastTurn)
     }
 }
 
-class TrackingNotEnforcingTest {
+class CorrectionsTest {
     @Test
-    fun `extra attacks are counted, never blocked`() {
-        val s = ambush().run(
-            lyraActor to attack(BOSS, roll = 8),
-            Actor.Dm to Command.ResolveAttack(hit = false),
-            lyraActor to attack(BOSS, roll = 9),
-            Actor.Dm to Command.ResolveAttack(hit = false),
-            lyraActor to attack(BOSS, roll = 10), // a third Action attack (Action Surge, Haste...) is still allowed
-            Actor.Dm to Command.ResolveAttack(hit = false),
-        )
-        assertEquals(3, s.combatant(LYRA).resources.attacksThisTurn)
+    fun `editing an attack adjusts HP by the difference`() {
+        val s = ambush().run(lyraActor to hit(LYRA, BOSS, 9))
+        val id = s.attacks.single().id
+        val fixed = s.run(Actor.Dm to Command.EditAttack(id, hit = true, damage = 4))
+        assertEquals(18, fixed.combatant(BOSS).hp)
+
+        val missed = fixed.run(Actor.Dm to Command.EditAttack(id, hit = false, damage = 0))
+        assertEquals(22, missed.combatant(BOSS).hp)
     }
 
     @Test
-    fun `free and bonus attacks mark their own resource`() {
-        val s = ambush().run(
-            lyraActor to attack(BOSS, roll = 8, cost = Cost.FREE),
-            Actor.Dm to Command.ResolveAttack(hit = false),
-            lyraActor to attack(BOSS, roll = 8, cost = Cost.BONUS),
-            Actor.Dm to Command.ResolveAttack(hit = false),
-        )
-        val r = s.combatant(LYRA).resources
-        assertTrue(r.bonusUsed)
-        assertTrue(!r.actionUsed)
+    fun `deleting an attack gives back exactly the HP it took`() {
+        val s = ambush().run(lyraActor to hit(LYRA, GOB1, 12)) // overkill: only 7 applied
+        val restored = s.run(Actor.Dm to Command.DeleteAttack(s.attacks.single().id))
+        assertEquals(7, restored.combatant(GOB1).hp)
+        assertNull(viewFor(restored, Actor.Dm).combatants.single { it.id == LYRA }.lastTurn)
     }
 
     @Test
-    fun `Dash doubles movement`() {
-        val s = ambush().run(lyraActor to Command.UseStandardAction("Dash", Cost.ACTION))
-        assertEquals(60, s.combatant(LYRA).movementLimit)
+    fun `players can fix their own entries during their turn, but not afterwards`() {
+        val s = ambush().run(lyraActor to hit(LYRA, BOSS, 9))
+        val id = s.attacks.single().id
+        assertIs<Decision.Accepted>(decide(s, Command.EditAttack(id, true, 6), lyraActor))
+        assertIs<Decision.Rejected>(decide(s, Command.EditAttack(id, true, 6), bramActor))
+
+        val later = s.run(lyraActor to Command.NextTurn)
+        assertIs<Decision.Rejected>(decide(later, Command.DeleteAttack(id), lyraActor))
+        assertIs<Decision.Accepted>(decide(later, Command.DeleteAttack(id), Actor.Dm))
     }
 }
 
 class TurnOrderTest {
     @Test
-    fun `next turn skips hidden and downed enemies and wraps the round`() {
+    fun `next turn skips hidden and defeated combatants and wraps the round`() {
         val s = ambush(current = GOB1).run(Actor.Dm to Command.NextTurn)
-        assertEquals(BRAM, s.currentId) // archer is hidden
+        assertEquals(BRAM, s.currentId) // the archer is hidden
 
         val wrapped = s.run(bramActor to Command.NextTurn)
         assertEquals(BOSS, wrapped.currentId)
         assertEquals(4, wrapped.round)
+
+        val bossDown = wrapped.run(Actor.Dm to Command.SetDefeated(BOSS, true), Actor.Dm to Command.PreviousTurn)
+        assertEquals(BRAM, bossDown.currentId)
+        assertEquals(3, bossDown.round)
     }
 
     @Test
-    fun `a new turn resets resources and temporary AC`() {
-        val shielded = ambush(current = GOB1).run(
-            Actor.Dm to attack(LYRA, roll = 17),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.React("Shield"),
+    fun `only the DM or the current player can end a turn`() {
+        assertIs<Decision.Rejected>(decide(ambush(), Command.NextTurn, bramActor))
+        assertIs<Decision.Accepted>(decide(ambush(), Command.NextTurn, lyraActor))
+        assertIs<Decision.Rejected>(decide(ambush(), Command.PreviousTurn, lyraActor))
+    }
+
+    @Test
+    fun `the first next turn starts combat at the top of the order`() {
+        val s = ambush(current = null).copy(round = 0).run(Actor.Dm to Command.NextTurn)
+        assertEquals(BOSS, s.currentId)
+        assertEquals(1, s.round)
+    }
+}
+
+class DmEditingTest {
+    @Test
+    fun `the DM can edit any field, and initiative re-sorts the list`() {
+        val s = ambush().run(
+            Actor.Dm to Command.EditCombatant(BRAM, name = "Bram the Bold", ac = 18, hp = 25, initiative = 20, portraitKey = "img/bram.webp"),
         )
-        val bossTurn = ambush().copy(combatants = shielded.combatants, currentId = BRAM)
-            .run(bramActor to Command.NextTurn, Actor.Dm to Command.NextTurn) // boss, then lyra
-        assertEquals(LYRA, bossTurn.currentId)
-        assertEquals(15, bossTurn.combatant(LYRA).effectiveAc)
-        assertTrue(!bossTurn.combatant(LYRA).resources.reactionUsed)
+        val bram = s.combatant(BRAM)
+        assertEquals("Bram the Bold", bram.name)
+        assertEquals(18, bram.ac)
+        assertEquals(25, bram.hp)
+        assertEquals("img/bram.webp", bram.portraitKey)
+        assertEquals(listOf(BOSS, BRAM, LYRA, GOB1, ARCHER), s.order)
     }
 
     @Test
-    fun `a player cannot end the turn while an attack is pending`() {
-        val s = ambush().run(lyraActor to attack(BOSS, roll = 18))
-        assertIs<Decision.Rejected>(decide(s, Command.NextTurn, lyraActor))
-        assertIs<Decision.Accepted>(decide(s, Command.NextTurn, Actor.Dm)) // the DM can always move on
+    fun `players cannot edit, add, reveal or reorder`() {
+        val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, 12, 13, 7, 7)
+        listOf(
+            Command.EditCombatant(LYRA, hp = 27),
+            Command.AddCombatant(gob),
+            Command.RevealCombatant(ARCHER),
+            Command.Reorder(ambush().order.reversed()),
+        ).forEach { assertIs<Decision.Rejected>(decide(ambush(), it, lyraActor)) }
+    }
+
+    @Test
+    fun `new enemies slot into initiative order`() {
+        val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, initiative = 16, ac = 13, hp = 7, maxHp = 7)
+        val s = ambush().run(Actor.Dm to Command.AddCombatant(gob))
+        assertEquals(listOf(BOSS, gob.id, LYRA, GOB1, ARCHER, BRAM), s.order)
+    }
+
+    @Test
+    fun `revealing makes a hidden enemy visible and able to take turns`() {
+        val s = ambush(current = GOB1).run(Actor.Dm to Command.RevealCombatant(ARCHER), Actor.Dm to Command.NextTurn)
+        assertEquals(ARCHER, s.currentId)
+        assertTrue(viewFor(s, lyraActor).combatants.any { it.id == ARCHER })
+    }
+
+    @Test
+    fun `removing the current combatant hands the turn on`() {
+        val s = ambush().run(Actor.Dm to Command.RemoveCombatant(LYRA))
+        assertEquals(GOB1, s.currentId)
+        assertTrue(LYRA !in s.order)
     }
 }
 
 class VisibilityTest {
     @Test
-    fun `players never receive enemy numbers, private conditions or hidden enemies`() {
+    fun `players never receive enemy AC or HP, or hidden enemies`() {
         val view = viewFor(ambush(), lyraActor)
-        val gob = view.combatants.single { it.id == GOB1 }
-        assertNull(gob.hp)
-        assertNull(gob.ac)
-        assertNull(gob.resources)
-        assertEquals(listOf("Prone"), gob.conditions.map { it.name })
+        val boss = view.combatants.single { it.id == BOSS }
+        assertNull(boss.ac)
+        assertNull(boss.hp)
+        assertNull(boss.maxHp)
+        assertEquals("img/boss.webp", boss.portraitKey)
         assertTrue(view.combatants.none { it.id == ARCHER })
 
         val bram = view.combatants.single { it.id == BRAM }
@@ -300,48 +236,17 @@ class VisibilityTest {
     @Test
     fun `the DM sees everything`() {
         val view = viewFor(ambush(), Actor.Dm)
-        val gob = view.combatants.single { it.id == GOB1 }
-        assertEquals(7, gob.hp)
-        assertEquals(2, gob.conditions.size)
+        assertEquals(22, view.combatants.single { it.id == BOSS }.hp)
         assertNotNull(view.combatants.singleOrNull { it.id == ARCHER })
     }
 
     @Test
-    fun `a player's pending attack does not reveal the enemy's AC`() {
-        val s = ambush().run(lyraActor to attack(BOSS, roll = 18))
-        assertNull(viewFor(s, lyraActor).pending?.targetAc)
-        assertEquals(15, viewFor(s, Actor.Dm).pending?.targetAc)
-    }
-
-    @Test
-    fun `an enemy knocked out gets a private Unconscious`() {
-        val s = ambush().run(
-            lyraActor to attack(GOB1, roll = 18),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.SubmitDamage(9, "slashing"),
-            Actor.Dm to Command.ApplyDamage(9),
-        )
-        val forPlayer = viewFor(s, lyraActor).combatants.single { it.id == GOB1 }
-        assertTrue(forPlayer.conditions.none { it.name == "Unconscious" })
-    }
-}
-
-class HintsTest {
-    @Test
-    fun `hints come from conditions the viewer can see`() {
-        val s = ambush()
-        val forLyra = hintsFor(s.combatant(LYRA), s.combatant(GOB1), lyraActor).map { it.text }
-        assertEquals(listOf("Goblin 1 is Prone: advantage for melee within 5 ft, disadvantage for ranged"), forLyra)
-
-        val forDm = hintsFor(s.combatant(GOB1), s.combatant(BRAM), Actor.Dm)
-        assertTrue(forDm.any { it.private && it.text.startsWith("Goblin 1 is Poisoned") })
-    }
-
-    @Test
-    fun `your own conditions are phrased to you`() {
-        val s = ambush(current = BRAM)
-        val hints = hintsFor(s.combatant(BRAM), s.combatant(BOSS), bramActor).map { it.text }
-        assertEquals(listOf("You are Poisoned: disadvantage on attack rolls"), hints)
+    fun `players don't learn hidden enemies' names or attacks through the log`() {
+        val s = ambush().run(Actor.Dm to hit(ARCHER, BRAM, 5), Actor.Dm to hit(LYRA, ARCHER, 3))
+        val forLyra = viewFor(s, lyraActor)
+        assertTrue(forLyra.attacks.none { it.attackerId == ARCHER })
+        assertNull(forLyra.attacks.single { it.attackerId == LYRA }.targetName)
+        assertEquals(14, forLyra.combatants.single { it.id == BRAM }.hp) // the damage itself still shows
     }
 }
 
@@ -350,10 +255,10 @@ class ReplayTest {
     fun `folding the same events always gives the same state`() {
         val start = ambush()
         val commands = listOf(
-            lyraActor to attack(BOSS, roll = 18),
-            Actor.Dm to Command.ResolveAttack(hit = true),
-            lyraActor to Command.SubmitDamage(9, "slashing"),
-            Actor.Dm to Command.ApplyDamage(9),
+            lyraActor to hit(LYRA, BOSS, 9),
+            Actor.Dm to Command.EditAttack(AttackId("a1"), hit = true, damage = 6),
+            lyraActor to Command.NextTurn,
+            Actor.Dm to hit(GOB1, BRAM, 4),
         )
         val events = mutableListOf<Event>()
         var s = start
