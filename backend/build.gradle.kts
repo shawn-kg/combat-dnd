@@ -43,3 +43,8 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// `./gradlew bootRun` is for local development: seed data and ?as= sign-in (see DevSeed and DevActorResolver).
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    systemProperty("spring.profiles.active", System.getProperty("spring.profiles.active") ?: "dev")
+}

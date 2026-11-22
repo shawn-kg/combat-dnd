@@ -47,13 +47,12 @@ create table encounter (
     name                 text        not null,
     status               text        not null default 'PREPARING'
         check (status in ('PREPARING', 'ROLLING_INITIATIVE', 'ACTIVE', 'ENDED')),
-    round                int         not null default 0,
-    current_combatant_id uuid,
+    -- Bumped by every command and undo. Clients send the version they saw; a stale one gets 409.
     version              bigint      not null default 0,
     created_at           timestamptz not null default now()
 );
 
--- The saved roster the DM prepares ahead of time. Start combat turns it into combatant rows.
+-- The saved roster the DM prepares ahead of time. Start combat turns it into CombatantAdded events.
 create table encounter_party (
     encounter_id uuid    not null references encounter (id) on delete cascade,
     character_id uuid    not null references character (id) on delete cascade,
@@ -71,32 +70,12 @@ create table encounter_enemy (
 );
 create index encounter_enemy_encounter_idx on encounter_enemy (encounter_id);
 
-create table combatant (
-    id                  uuid primary key default gen_random_uuid(),
-    encounter_id        uuid    not null references encounter (id) on delete cascade,
-    side                text    not null check (side in ('PARTY', 'ENEMY')),
-    character_id        uuid    references character (id) on delete cascade,
-    monster_template_id uuid    references monster_template (id) on delete set null,
-    name                text    not null,
-    portrait_key        text,
-    initiative          int     not null default 0,
-    sort_order          int     not null default 0,
-    ac                  int, -- enemies only; party members use character
-    max_hp              int,
-    current_hp          int,
-    hidden              boolean not null default false,
-    defeated            boolean not null default false
-);
-create index combatant_encounter_idx on combatant (encounter_id);
-
-alter table encounter
-    add constraint encounter_current_combatant_fk
-        foreign key (current_combatant_id) references combatant (id) on delete set null;
-
--- Append-only: attacks logged, edits, turn changes. Last-turn summaries and undo come from here.
+-- The fight itself: combatants added, attacks logged, edits, turn changes. Append-only; the current
+-- tracker is these events folded in order. One command writes one batch; undo marks a whole batch undone.
 create table encounter_event (
     encounter_id uuid        not null references encounter (id) on delete cascade,
     seq          bigint      not null,
+    batch        bigint      not null,
     actor_role   text        not null check (actor_role in ('DM', 'PLAYER')),
     actor_id     uuid,
     type         text        not null,
@@ -105,3 +84,4 @@ create table encounter_event (
     created_at   timestamptz not null default now(),
     primary key (encounter_id, seq)
 );
+create index encounter_event_batch_idx on encounter_event (encounter_id, batch);

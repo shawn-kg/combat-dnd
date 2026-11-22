@@ -87,7 +87,7 @@ The row's last-turn line lists every attack from that turn, plus a total when th
 
 ## Data model
 
-Postgres holds everything except image files, which go to object storage. The server caches each active encounter in memory and rebuilds it from its events when needed. The schema is in `backend/src/main/resources/db/migration/V1__init.sql`.
+Postgres holds everything except image files, which go to object storage. A fight lives entirely in its event log: there is no combatant table, so the tracker can never drift from the log. The server caches each active encounter in memory and rebuilds it from its events after a restart or an undo. One command writes one `batch` of events, and undo marks the latest batch undone. The schema is in `backend/src/main/resources/db/migration/V1__init.sql`.
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
@@ -96,10 +96,9 @@ Postgres holds everything except image files, which go to object storage. The se
 | `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
 | `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |
 | `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), round, current_combatant_id, version | `version` guards against conflicting edits |
-| `combatant` | encounter_id, side (PARTY, ENEMY), character_id or monster_template_id, name, portrait_key, initiative, sort_order, ac and hp (enemies only), hidden, defeated | One row per participant |
-| `encounter_event` | encounter_id, seq, actor, type, payload, undone, created_at | Append-only; attacks, edits and turn changes |
+| `encounter_event` | encounter_id, seq, batch, actor, type, payload, undone, created_at | Append-only; the fight itself: combatants added, attacks, edits, turn changes |
 
-An encounter's saved roster lives in two more tables: `encounter_party` (encounter_id, character_id, included) and `encounter_enemy` (encounter_id, monster_template_id, count, hidden). **Start combat** turns the roster into `combatant` rows.
+An encounter's saved roster lives in two more tables: `encounter_party` (encounter_id, character_id, included) and `encounter_enemy` (encounter_id, monster_template_id, count, hidden). **Start combat** turns the roster into `CombatantAdded` events.
 
 `portrait_key` names a file in object storage. A player's character is set once, when `character.player_id` is filled; only the DM can change it after that.
 
