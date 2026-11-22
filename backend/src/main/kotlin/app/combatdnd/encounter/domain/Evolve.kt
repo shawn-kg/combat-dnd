@@ -1,116 +1,80 @@
 package app.combatdnd.encounter.domain
 
-import app.combatdnd.encounter.domain.AttackStage.AWAITING_DAMAGE
-import app.combatdnd.encounter.domain.AttackStage.DAMAGE_SUBMITTED
-import app.combatdnd.encounter.domain.AttackStage.DECLARED
-import app.combatdnd.encounter.domain.AttackStage.REACTION_WINDOW
-import app.combatdnd.encounter.domain.AttackStage.RESUBMIT
-
 /** Apply one event. Pure: the current state is `events.fold(initial, ::evolve)`. */
 fun evolve(state: EncounterState, event: Event): EncounterState {
     val next = when (event) {
-        is Event.AttackDeclared -> state
-            .update(event.attackerId) { it.spend(event.cost, isAttack = event.kind == AttackKind.ATTACK) }
-            .copy(
-                pending = PendingAttack(
-                    attackerId = event.attackerId,
-                    targetId = event.targetId,
-                    label = event.label,
-                    kind = event.kind,
-                    roll = event.roll,
-                    rollMode = event.rollMode,
-                    natural = event.natural,
-                    early = event.early,
-                    stage = DECLARED,
-                ),
+        is Event.AttackLogged -> {
+            val target = state.combatant(event.targetId)
+            val applied = if (event.hit) minOf(event.damage, target.hp) else 0
+            state
+                .update(target.id) { it.copy(hp = it.hp - applied) }
+                .copy(
+                    attacks = state.attacks + AttackEntry(
+                        event.id, event.round, event.attackerId, event.targetId, event.hit, event.damage, applied,
+                    ),
+                )
+        }
+
+        is Event.AttackEdited -> {
+            val entry = state.attack(event.id)!!
+            val restored = state.giveBack(entry)
+            val target = restored.combatants[entry.targetId]
+            val applied = if (event.hit && target != null) minOf(event.damage, target.hp) else 0
+            val withHp = if (target != null) restored.update(target.id) { it.copy(hp = it.hp - applied) } else restored
+            withHp.updateAttack(entry.id) { it.copy(hit = event.hit, damage = event.damage, applied = applied) }
+        }
+
+        is Event.AttackDeleted -> {
+            val entry = state.attack(event.id)!!
+            state.giveBack(entry).updateAttack(entry.id) { it.copy(deleted = true, applied = 0) }
+        }
+
+        is Event.TurnChanged -> state.copy(currentId = event.currentId, round = event.round)
+
+        is Event.CombatantAdded -> {
+            val added = state.copy(
+                combatants = state.combatants + (event.combatant.id to event.combatant),
+                order = state.order + event.combatant.id,
             )
-
-        is Event.AttackResolved -> {
-            val p = state.pending!!
-            if (!event.hit) state.copy(pending = null)
-            else state.copy(pending = p.copy(stage = stageAfterHit(state.combatant(p.targetId))))
+            added.copy(order = sortByInitiative(added))
         }
 
-        is Event.AttackSentBack -> {
-            val p = state.pending!!
-            val stage = if (p.stage == DAMAGE_SUBMITTED) AWAITING_DAMAGE else RESUBMIT
-            state.copy(pending = p.copy(stage = stage, sendBackReason = event.reason))
+        is Event.CombatantRemoved -> {
+            val handOff = if (state.currentId == event.id) nextTurn(state)?.takeIf { it.first != event.id } else null
+            state.copy(
+                combatants = state.combatants - event.id,
+                order = state.order - event.id,
+                currentId = if (state.currentId == event.id) handOff?.first else state.currentId,
+                round = handOff?.second ?: state.round,
+            )
         }
 
-        is Event.AttackResubmitted -> state.copy(
-            pending = state.pending!!.copy(
-                stage = DECLARED,
-                roll = event.roll,
-                rollMode = event.rollMode,
-                natural = event.natural,
-                sendBackReason = null,
-            ),
-        )
+        is Event.CombatantRevealed -> state.update(event.id) { it.copy(hidden = false) }
 
-        is Event.ReactionUsed -> {
-            val after = state.update(event.combatantId) {
-                it.copy(
-                    acBonus = it.acBonus + event.acBonus,
-                    resources = it.resources.copy(reactionUsed = true),
+        is Event.DefeatedSet -> state.update(event.id) { it.copy(defeated = event.defeated) }
+
+        is Event.CombatantEdited -> {
+            val edited = state.update(event.id) { c ->
+                val maxHp = event.maxHp ?: c.maxHp
+                c.copy(
+                    name = event.name ?: c.name,
+                    portraitKey = event.portraitKey ?: c.portraitKey,
+                    initiative = event.initiative ?: c.initiative,
+                    ac = event.ac ?: c.ac,
+                    maxHp = maxHp,
+                    hp = (event.hp ?: c.hp).coerceAtMost(maxHp),
                 )
             }
-            val p = after.pending
-            val reactsToHit = p != null && p.targetId == event.combatantId &&
-                (p.stage == REACTION_WINDOW || (event.automatic && p.stage == AWAITING_DAMAGE))
-            when {
-                !reactsToHit -> after
-                turnsIntoMiss(p, after.combatant(event.combatantId)) -> after.copy(pending = null)
-                else -> after.copy(pending = p.copy(stage = AWAITING_DAMAGE))
-            }
+            if (event.initiative != null) edited.copy(order = sortByInitiative(edited)) else edited
         }
 
-        Event.ReactionSkipped -> state.copy(pending = state.pending!!.copy(stage = AWAITING_DAMAGE))
-
-        is Event.DamageSubmitted -> state.copy(
-            pending = state.pending!!.copy(stage = DAMAGE_SUBMITTED, damage = event.amount, damageType = event.damageType),
-        )
-
-        is Event.DamageApplied -> state
-            .update(event.targetId) { it.takeDamage(event.amount) }
-            .copy(pending = null)
-
-        is Event.StandardActionUsed -> state.update(event.combatantId) {
-            val spent = it.spend(event.cost, isAttack = false)
-            if (event.label == "Dash") spent.copy(resources = spent.resources.copy(dashed = true)) else spent
-        }
-
-        is Event.TurnAdvanced -> state
-            .update(event.nextId) { it.copy(resources = Resources(), acBonus = 0) }
-            .copy(currentId = event.nextId, round = event.round, pending = null)
+        is Event.Reordered -> state.copy(order = event.order)
     }
     return next.copy(version = state.version + 1)
 }
 
-/** The reaction window opens only for a party target with a reaction left that wants to be asked. */
-private fun stageAfterHit(target: Combatant): AttackStage {
-    if (target.side != Side.PARTY || target.resources.reactionUsed) return AWAITING_DAMAGE
-    val wantsToBeAsked = target.reactions.isEmpty() || target.reactions.any { it.mode == ReactionMode.ASK }
-    return if (wantsToBeAsked) REACTION_WINDOW else AWAITING_DAMAGE
-}
-
-private fun turnsIntoMiss(attack: PendingAttack, target: Combatant): Boolean =
-    attack.kind == AttackKind.ATTACK && attack.natural != Natural.TWENTY && attack.roll < target.effectiveAc
-
-private fun Combatant.spend(cost: Cost, isAttack: Boolean): Combatant {
-    val r = resources
-    val spent = when (cost) {
-        Cost.ACTION -> r.copy(actionUsed = true, attacksThisTurn = r.attacksThisTurn + if (isAttack) 1 else 0)
-        Cost.BONUS -> r.copy(bonusUsed = true)
-        Cost.REACTION -> r.copy(reactionUsed = true)
-        Cost.FREE -> r
-    }
-    return copy(resources = spent)
-}
-
-private fun Combatant.takeDamage(amount: Int): Combatant {
-    val hpLeft = (hp - amount).coerceAtLeast(0)
-    val knockedOut = hpLeft == 0 && conditions.none { it.name == "Unconscious" }
-    // An enemy's Unconscious is private: it would reveal its health.
-    val newConditions = if (knockedOut) conditions + Condition("Unconscious", private = side == Side.ENEMY) else conditions
-    return copy(hp = hpLeft, conditions = newConditions)
+/** Undo an entry's effect on HP. A target that has since been removed is skipped. */
+private fun EncounterState.giveBack(entry: AttackEntry): EncounterState {
+    if (entry.applied == 0 || entry.targetId !in combatants) return this
+    return update(entry.targetId) { it.copy(hp = minOf(it.maxHp, it.hp + entry.applied)) }
 }

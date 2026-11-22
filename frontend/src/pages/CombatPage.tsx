@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { InitiativeFeed } from '../combat/InitiativeFeed'
+import { Tracker } from '../combat/Tracker'
 import { useEncounter } from '../combat/useEncounter'
 
 export function CombatPage() {
@@ -15,7 +15,7 @@ export function CombatPage() {
   }
   return (
     <main className="page">
-      <InitiativeFeed view={view} />
+      <Tracker view={view} />
     </main>
   )
 }

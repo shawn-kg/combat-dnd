@@ -1,0 +1,188 @@
+.tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tracker-head .round {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* initiative | portrait | name | AC | HP | last turn */
+.row {
+  display: grid;
+  grid-template-columns: 32px 48px minmax(0, 1fr) 44px 112px minmax(0, 1.2fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--party);
+  border-radius: 10px;
+}
+.row.enemy {
+  border-left-color: var(--enemy);
+}
+.row.current {
+  border-color: var(--gold);
+  border-left-color: var(--gold);
+  box-shadow:
+    0 0 0 3px var(--gold-soft),
+    0 4px 20px var(--gold-soft);
+}
+.row.defeated {
+  opacity: 0.45;
+}
+.row.defeated .name {
+  text-decoration: line-through;
+}
+.row.hidden {
+  border-style: dashed;
+  background: transparent;
+}
+
+.init {
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+}
+
+.portrait {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--party);
+  background: var(--party-bg);
+}
+.row.enemy .portrait {
+  border-color: var(--enemy);
+  background: var(--enemy-bg);
+}
+.portrait.initials {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tags {
+  display: flex;
+  gap: 6px;
+}
+.tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+.tag.you {
+  color: var(--party);
+  border-color: var(--party);
+}
+.tag.turn {
+  background: var(--gold);
+  color: var(--on-gold);
+  border-color: var(--gold);
+}
+
+.ac {
+  font-weight: 600;
+  text-align: center;
+}
+
+.hp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+.hp .bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.hp .bar i {
+  display: block;
+  height: 100%;
+  transition: width 0.35s ease;
+}
+.hp .bar i.high {
+  background: var(--hp-high);
+}
+.hp .bar i.mid {
+  background: var(--hp-mid);
+}
+.hp .bar i.low {
+  background: var(--hp-low);
+}
+
+.last {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.last .round-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.last .total {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.last .hit {
+  color: var(--hp-high);
+}
+.last .miss {
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 28px 40px minmax(0, 1fr) 36px 84px;
+  }
+  .portrait {
+    width: 40px;
+    height: 40px;
+  }
+  .last {
+    grid-column: 3 / -1;
+  }
+}
