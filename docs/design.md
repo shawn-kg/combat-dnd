@@ -57,7 +57,7 @@ The DM uploads a picture for each character and monster template. It's cropped t
 
 Everything the DM sets up is saved, so starting a fight takes seconds.
 
-- **Party:** the characters persist between sessions. The DM sets each one's portrait, AC, HP and max HP, and HP carries over from the last fight.
+- **Party:** the characters persist between sessions. The DM adds characters (each shows "Not claimed yet" until a player picks it) and sets their portrait, AC and max HP. HP carries over from the last fight, and each player can set their own current HP before combat, after a rest for example, so the DM doesn't have to.
 - **Saved encounters:** the DM can keep several ready, for example "Goblin Ambush" and "Wolves at the Bridge". Each one lists which party members are in it (untick anyone who isn't playing tonight) and its enemies from templates, with a count and a hidden option ("Goblin × 2", "Goblin Archer × 1, hidden").
 - Changes save automatically. Nothing needs to be re-entered at the table.
 
@@ -115,7 +115,7 @@ A combatant's **last turn** is not stored as a column. It is every `AttackLogged
 | Last-turn summary (hit or miss, damage) | Yes | Yes |
 | Hidden enemies | Yes | Not until revealed |
 | Defeated enemies | Yes | Shown greyed out |
-| Edit controls | Everything | Log attacks on their own turn |
+| Edit controls | Everything | Log attacks on their own turn; set their own HP before combat |
 
 ## Backend
 
@@ -129,13 +129,13 @@ fun evolve(state: EncounterState, event: Event): EncounterState
 fun viewFor(state: EncounterState, viewer: Actor): EncounterView
 ```
 
-- `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn.
+- `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn. Before combat (prep and initiative), a player may also set their own character's current HP.
 - Current state is `events.fold(initial, ::evolve)`. Undo marks the last event undone and replays.
 - Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
 - `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
 - Party HP is written back to `character.current_hp`, so it carries over to the next fight.
 
-Starting and ending a fight: `StartCombat` (builds combatants from the roster, status becomes ROLLING_INITIATIVE), `SetInitiative`, `BeginRound1` (ACTIVE), and `EndCombat` (writes party HP back, status becomes ENDED). Roster edits during prep are plain CRUD: `PUT /api/encounters/{id}/roster`.
+Starting and ending a fight: `StartCombat` (builds combatants from the roster, status becomes ROLLING_INITIATIVE), `SetInitiative`, `BeginRound1` (ACTIVE), and `EndCombat` (writes party HP back, status becomes ENDED). A player sets their own HP with `PATCH /api/characters/{cid}/hp`, allowed only while no fight is in progress. Roster edits during prep are plain CRUD: `PUT /api/encounters/{id}/roster`.
 
 ### API
 
