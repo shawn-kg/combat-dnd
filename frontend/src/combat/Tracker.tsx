@@ -11,6 +11,18 @@ import { TurnLog } from './TurnLog'
 import type { SendResult } from './useEncounter'
 import './tracker.css'
 
+/**
+ * Opens this page in its own narrow window, sized to sit beside D&D Beyond. The same name each time,
+ * so pressing it again brings that window back instead of opening another.
+ */
+function popOut(name: string) {
+  const w = window.open(window.location.href, `combat-dnd:${window.location.pathname}`, 'popup,width=440,height=900')
+  if (w) {
+    w.focus()
+    w.document.title = `${name} · Combat D&D`
+  }
+}
+
 /** Sends a command; on failure shows the reason and resolves false. */
 export type Act = (command: Command) => Promise<boolean>
 
@@ -86,21 +98,30 @@ export function Tracker({
         </span>
         {!connected && <span className="offline">Reconnecting…</span>}
         <span className="spacer" />
+        <button
+          type="button"
+          className="btn small wide-only"
+          title="Open the tracker in its own small window, to keep beside D&D Beyond"
+          onClick={() => popOut(view.name)}
+        >
+          ⧉ Pop out
+        </button>
         {dm && (
-          <>
-            <button type="button" className="btn small" onClick={doUndo}>
-              ↶ Undo<kbd>U</kbd>
+          <span className="dm-buttons">
+            <button type="button" className="btn small" aria-label="Undo (U)" onClick={doUndo}>
+              ↶<span className="wide-only"> Undo</span>
+              <kbd className="wide-only">U</kbd>
             </button>
-            <button type="button" className="btn small" aria-expanded={adding !== null} onClick={() => setAdding(adding ? null : 'enemy')}>
-              + Add
+            <button type="button" className="btn small" aria-label="Add" aria-expanded={adding !== null} onClick={() => setAdding(adding ? null : 'enemy')}>
+              +<span className="wide-only"> Add</span>
             </button>
-            <button type="button" className="btn small" onClick={() => act({ type: 'PreviousTurn' })}>
-              ◀ Previous
+            <button type="button" className="btn small" aria-label="Previous turn" onClick={() => act({ type: 'PreviousTurn' })}>
+              ◀<span className="wide-only"> Previous</span>
             </button>
-            <button type="button" className="btn small primary" onClick={() => act({ type: 'NextTurn' })}>
-              Next turn ▶<kbd>N</kbd>
+            <button type="button" className="btn small primary" aria-label="Next turn (N)" onClick={() => act({ type: 'NextTurn' })}>
+              Next turn ▶<kbd className="wide-only">N</kbd>
             </button>
-          </>
+          </span>
         )}
       </div>
 
@@ -252,7 +273,7 @@ function TrackerRow({
           )}
         </span>
         <Hp c={c} dm={dm} canEditHp={dm || c.controlledByViewer} edit={edit} />
-        <span className="last">
+        <span className={`last${c.lastTurn ? '' : ' none'}`}>
           {c.lastTurn ? (
             <>
               <span className="round-tag">Round {c.lastTurn.round}</span>

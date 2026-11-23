@@ -212,6 +212,7 @@ The tracker is one list of rows in initiative order, like D&D Beyond. Dark is th
 - **Last turn**: one line per attack ("Hit Goblin 2 · 9", "Miss Goblin 1"), with a total when there are several. Hits in green, misses muted, damage in red.
 - **Current turn**: gold border and glow; the list scrolls to it on each turn change.
 - **Defeated**: greyed out with a strikethrough. **Hidden** (DM only): dashed border and an eye-off icon.
+- **Compact layout** (windows 520 px wide or less, e.g. beside D&D Beyond, or a phone): each row keeps initiative, portrait, name, AC and HP on one line, with the last turn and the turn buttons on a second line under the name only when there's something to show. DM buttons shrink to icons with Next turn on the right. **Pop out** (wider windows only) opens the tracker in its own 440 × 900 window to keep beside D&D Beyond.
 - The color tokens from the earlier design stay the same (`frontend/src/styles/tokens.css`).
 
 ## Infrastructure

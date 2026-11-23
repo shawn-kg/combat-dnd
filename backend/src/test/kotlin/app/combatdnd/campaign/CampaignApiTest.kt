@@ -229,6 +229,26 @@ class CampaignApiTest(
     }
 
     @Test
+    fun `handing the campaign to another DM, then joining it as a player`() {
+        val t = Table()
+        // The person who set it up hands it over: the real DM signs in with the link and signs the others out.
+        val code = t.dm.post("/api/campaigns/${t.id}/dm-link").json().get("code").asString()
+        val realDm = Browser()
+        realDm.post("/api/dm-sign-in/$code")
+        assertEquals(1, realDm.post("/api/campaigns/${t.id}/dm-devices/sign-out-others").json().get("signedOut").asInt())
+        realDm.post("/api/campaigns/${t.id}/dm-link") // and makes a fresh link only they have
+
+        // The old laptop is no longer the DM, and joins like any player.
+        assertEquals(401, t.dm.get("/api/campaigns/${t.id}").statusCode())
+        val me = t.dm.post("/api/join/${t.code}", """{"name":"Shawn"}""").json().get("playerId").asString()
+        assertEquals(204, realDm.post("/api/campaigns/${t.id}/players/$me/approve").statusCode())
+        val view = t.dm.read("/api/campaigns/${t.id}")
+        assertEquals("PLAYER", view.get("role").asString())
+        assertTrue(t.dm.read("/api/me/campaigns").none { it.get("role").asString() == "DM" })
+        assertTrue(t.dm.read("/api/me/campaigns").any { it.get("id").asString() == t.id && it.get("role").asString() == "PLAYER" })
+    }
+
+    @Test
     fun `the home page lists this browser's campaigns`() {
         val t = Table()
         val (sam, _) = t.approvedPlayer("Sam")

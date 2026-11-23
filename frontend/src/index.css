@@ -72,3 +72,16 @@ select {
     transition: none !important;
   }
 }
+
+/* Compact: a narrow window beside D&D Beyond, or a phone. */
+@media (max-width: 520px) {
+  .app-bar {
+    padding: 6px 10px;
+  }
+  .logo {
+    font-size: 14px;
+  }
+  .page {
+    padding: 10px 8px 32px;
+  }
+}
