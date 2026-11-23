@@ -23,10 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Portrait uploads and monster templates over real HTTP. Needs Postgres: runs with RUN_DB_TESTS=true. */
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = ["combat.portraits.dir=build/test-portraits"],
-)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("dev")
 @EnabledIfEnvironmentVariable(named = "RUN_DB_TESTS", matches = "true")
 class PortraitAndTemplateApiTest(@Autowired private val env: Environment, @Autowired private val json: ObjectMapper) {

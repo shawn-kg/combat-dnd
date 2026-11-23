@@ -21,4 +21,7 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=backend /backend/build/libs/combat-dnd-*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+# Tuned for a 512 MB free instance: a modest heap, the serial GC (one small CPU), and capped
+# code cache and thread stacks so the whole process stays well under the limit.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=55 -XX:+UseSerialGC -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=128m -Xss512k -XX:TieredStopAtLevel=1"
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,0 +1,16 @@
+# Render Blueprint: one free web service built from the Dockerfile. See docs/deploy.md.
+# The database is Neon (free); paste its connection string as DATABASE_URL when Render asks.
+services:
+  - type: web
+    name: combat-dnd
+    runtime: docker
+    plan: free
+    # Keep this in the same region as the Neon database (Neon: AWS US East 2, Ohio).
+    region: ohio
+    branch: main
+    # Deploy main only after CI passes, so a broken build never replaces a working one.
+    autoDeployTrigger: checksPass
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false # a secret: entered in the Render dashboard, never stored in the repo

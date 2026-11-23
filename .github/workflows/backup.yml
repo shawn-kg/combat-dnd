@@ -1,0 +1,31 @@
+# Nightly database backup: pg_dump of the Neon database, kept as a workflow artifact for 30 days.
+# Needs the repository secret DATABASE_URL (the same connection string Render uses). See docs/deploy.md.
+name: Backup
+
+on:
+  schedule:
+    - cron: "17 9 * * *" # daily, 09:17 UTC
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump the database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::No DATABASE_URL secret yet, so there's nothing to back up."
+            exit 0
+          fi
+          # pg_dump must be at least the server's version; Neon runs Postgres 17.
+          docker run --rm -e DATABASE_URL postgres:17 sh -c 'pg_dump --format=custom --no-owner "$DATABASE_URL"' > combat-dnd.dump
+          ls -l combat-dnd.dump
+          test -s combat-dnd.dump
+      - uses: actions/upload-artifact@v4
+        with:
+          name: combat-dnd-${{ github.run_id }}
+          path: combat-dnd.dump
+          retention-days: 30
+          if-no-files-found: ignore
