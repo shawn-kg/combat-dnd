@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { WAKING_UP } from '../api/client'
 import type { Command, EncounterView } from '../api/types'
 
 export type SendResult = { ok: true } | { ok: false; message: string }
@@ -12,6 +13,10 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
   const asParam = devActor ? `?as=${encodeURIComponent(devActor)}` : ''
   const [view, setView] = useState<EncounterView | null>(null)
   const [connected, setConnected] = useState(false)
+  // Why the tracker can't be shown at all (not signed in, no such fight...), learned when the stream fails
+  // before the first snapshot. EventSource hides the status code, so ask the state endpoint for the reason.
+  const [problem, setProblem] = useState<{ status: number; message: string } | null>(null)
+  const gotSnapshot = useRef(false)
   // The newest version we know of, from a snapshot or a command's reply. A ref, so two commands in a row
   // (log an attack, then end the turn) don't send a stale version before the next snapshot arrives.
   const version = useRef(0)
@@ -21,10 +26,26 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
     source.addEventListener('state', (e) => {
       const next: EncounterView = JSON.parse((e as MessageEvent<string>).data)
       version.current = Math.max(version.current, next.version)
+      gotSnapshot.current = true
+      setProblem(null)
       setView((prev) => (prev && prev.version > next.version ? prev : next))
     })
     source.onopen = () => setConnected(true)
-    source.onerror = () => setConnected(false)
+    source.onerror = () => {
+      setConnected(false)
+      if (gotSnapshot.current) return // a dropped connection: EventSource reconnects by itself
+      fetch(`/api/encounters/${encounterId}/state${asParam}`, { credentials: 'include' })
+        .then(async (res) => {
+          if (res.ok) return
+          const body = await res.json().catch(() => null)
+          const message =
+            body?.message ?? (res.status === 502 || res.status === 503 || res.status === 504 ? WAKING_UP : 'This fight can’t be opened.')
+          setProblem({ status: res.status, message })
+          // Signed out, not in the campaign, or no such fight: retrying won't help, so stop.
+          if (res.status === 401 || res.status === 403 || res.status === 404) source.close()
+        })
+        .catch(() => undefined) // offline: keep showing "Connecting…" while EventSource retries
+    }
     return () => source.close()
   }, [encounterId, asParam])
 
@@ -76,5 +97,5 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
   /** DM only: end the fight; party HP is saved to the characters. */
   const end = useCallback(() => post('end'), [post])
 
-  return { view, connected, send, undo, begin, end }
+  return { view, connected, problem, send, undo, begin, end }
 }

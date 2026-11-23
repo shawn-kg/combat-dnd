@@ -8,12 +8,22 @@ import { useEncounter } from '../combat/useEncounter'
 export function CombatPage() {
   const { encounterId = '' } = useParams()
   const [search] = useSearchParams()
-  const { view, connected, send, undo, begin, end } = useEncounter(encounterId, search.get('as'))
+  const { view, connected, problem, send, undo, begin, end } = useEncounter(encounterId, search.get('as'))
 
   if (!view) {
     return (
-      <main className="page">
-        <p className="muted">{connected ? 'Loading the table…' : 'Connecting to the table…'}</p>
+      <main className="page stack">
+        {problem ? (
+          <>
+            <div className="notice" role="alert">
+              {problem.message}
+            </div>
+            {problem.status === 401 && <p className="muted small">If you’re a player, open the join link your DM sent you, then come back to the fight.</p>}
+            <Link to="/">Go to the start</Link>
+          </>
+        ) : (
+          <p className="muted">{connected ? 'Loading the table…' : 'Connecting to the table…'}</p>
+        )}
       </main>
     )
   }

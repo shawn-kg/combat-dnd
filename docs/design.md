@@ -244,7 +244,8 @@ Free: one Docker image on a Render free web service, with Neon's free Postgres. 
 3. Campaigns: join and approval, choosing a character, characters and monster templates, portrait uploads. Done.
 4. Prep and initiative: saved encounters, Start combat, the initiative step, Begin round 1, End combat with HP carried over. Done.
 5. Deploy on free hosting (Render and Neon, portraits in Postgres) with nightly backups. Ready; needs the Render and Neon accounts (docs/deploy.md).
-6. A compact layout for a small window beside D&D Beyond, phone layout, light theme, error states, and a test session with the group.
+6. A compact layout for a small window beside D&D Beyond (and phones), with Pop out. Done.
+7. Polish: light/dark theme toggle, clear messages for missing pages, crashes, a sleeping server and fights you can't open. Done. Next: a real session with the group (`docs/session-day.md`).
 
 Open questions:
 
