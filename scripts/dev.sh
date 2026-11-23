@@ -27,8 +27,16 @@ fail() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
 command -v java >/dev/null || fail "Java isn't installed. Run: sudo apt install -y openjdk-21-jdk"
 java_major=$(java -version 2>&1 | awk -F'"' '/version/ {split($2, v, "."); print v[1]; exit}')
 [[ "${java_major:-0}" -ge 21 ]] || fail "Java 21 or newer is needed (found ${java_major:-none}). Run: sudo apt install -y openjdk-21-jdk"
+node_major() { command -v node >/dev/null && node -p 'process.versions.node.split(".")[0]' || echo 0; }
+# An old system Node (Ubuntu's apt package is often v12) can win over nvm's in a new terminal.
+# If nvm is installed, load it and switch to Node 22 for this run.
+if [[ "$(node_major)" -lt 22 && -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
+  set +u; . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+  if nvm use 22 >/dev/null 2>&1; then say "Using Node $(node -v) from nvm"; fi
+  set -u
+fi
 command -v node >/dev/null || fail "Node isn't installed. Install nvm, then: nvm install 22 (see README)"
-node_major=$(node -p 'process.versions.node.split(".")[0]')
+node_major=$(node_major)
 [[ "$node_major" -ge 22 ]] || fail "Node 22 or newer is needed (found $(node -v)). Run: nvm install 22 && nvm alias default 22"
 command -v curl >/dev/null || fail "curl isn't installed. Run: sudo apt install -y curl"
 
