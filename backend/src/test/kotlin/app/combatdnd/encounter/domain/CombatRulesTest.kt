@@ -207,6 +207,19 @@ class DmEditingTest {
     }
 
     @Test
+    fun `nobody at 0 HP can attack, but they still take their turn, and healing lets them attack again`() {
+        val down = ambush().run(Actor.Dm to Command.EditCombatant(LYRA, hp = 0))
+        val r = decide(down, hit(LYRA, BOSS, 5), lyraActor)
+        assertIs<Decision.Rejected>(r)
+        assertEquals("Lyra is at 0 HP and can't attack. Heal them above 0 first.", r.message)
+        assertIs<Decision.Rejected>(decide(down, hit(LYRA, BOSS, 5), Actor.Dm)) // not even the DM
+        assertIs<Decision.Rejected>(decide(down, Command.LogAttack(LYRA, BOSS, hit = false, damage = 0), lyraActor)) // nor a miss
+        assertIs<Decision.Accepted>(decide(down, Command.NextTurn, lyraActor)) // death saves, then end the turn
+        val healed = down.run(lyraActor to Command.EditCombatant(LYRA, hp = 7))
+        assertIs<Decision.Accepted>(decide(healed, hit(LYRA, BOSS, 5), lyraActor))
+    }
+
+    @Test
     fun `players roll their own initiative before round 1, without re-sorting the list`() {
         val rolling = ambush(current = null)
         val s = rolling.run(lyraActor to Command.RollInitiative(LYRA, 2))
