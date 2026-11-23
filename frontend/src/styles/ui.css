@@ -49,6 +49,11 @@ kbd {
   font-weight: 500;
   cursor: pointer;
 }
+.chip[aria-pressed='true'] {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  font-weight: 600;
+}
 .chip.hitc[aria-pressed='true'] {
   border-color: var(--hp-high);
   color: var(--hp-high);

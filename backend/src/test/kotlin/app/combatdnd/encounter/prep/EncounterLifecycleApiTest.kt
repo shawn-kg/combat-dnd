@@ -132,6 +132,49 @@ class EncounterLifecycleApiTest(@Autowired private val env: Environment, @Autowi
     }
 
     @Test
+    fun `a late arrival joins mid-fight, run by their player, and their HP is saved at the end`() {
+        val t = Table()
+        // Ana plays Bram, who wasn't in the roster when the fight started.
+        val ana = Browser()
+        val anaId = ana.ok("POST", "/api/join/${t.code}", """{"name":"Ana"}""")!!.get("playerId").asString()
+        t.dm.ok("POST", "/api/campaigns/${t.id}/players/$anaId/approve")
+        ana.ok("POST", "/api/campaigns/${t.id}/characters/${t.bram}/claim")
+
+        val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Late"}""")!!.get("id").asString()
+        t.dm.ok(
+            "PUT", "/api/encounters/$enc/prep",
+            """{"name":"Late","party":[{"characterId":"${t.bram}","included":false}],"enemies":[{"templateId":"${t.goblin}","count":1}]}""",
+        )
+        t.dm.ok("POST", "/api/encounters/$enc/start")
+        val goblin = t.dm.read("/api/encounters/$enc/state").combatant("Goblin").get("id").asString()
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"SetInitiatives","initiatives":{"${t.lyra}":15,"$goblin":10}}""")
+        t.dm.ok("POST", "/api/encounters/$enc/begin")
+
+        // Bram arrives with his saved HP (19/31) and initiative 12: between Lyra and the goblin.
+        t.dm.ok(
+            "POST", "/api/encounters/$enc/commands",
+            """{"type":"AddCombatant","id":"${t.bram}","name":"Bram","side":"PARTY","playerId":"$anaId",
+               "initiative":12,"ac":16,"hp":19,"maxHp":31}""",
+        )
+        val state = t.dm.read("/api/encounters/$enc/state")
+        assertEquals(listOf("Lyra", "Bram", "Goblin"), state.get("combatants").toList().map { it.get("name").asString() })
+        assertTrue(ana.read("/api/encounters/$enc/state").combatant("Bram").get("controlledByViewer").asBoolean())
+        // Only the DM brings people in, and the same character can't be added twice.
+        assertEquals(403, ana.post("/api/encounters/$enc/commands", """{"type":"AddCombatant","id":"x","name":"X","side":"PARTY","initiative":1,"ac":1,"hp":1,"maxHp":1}""").statusCode())
+        assertEquals(400, t.dm.post("/api/encounters/$enc/commands", """{"type":"AddCombatant","id":"${t.bram}","name":"Bram","side":"PARTY","initiative":1,"ac":16,"hp":19,"maxHp":31}""").statusCode())
+
+        // Lyra's turn ends, Bram's turn: Ana logs his attack. Then the goblin hits Bram for 4.
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"NextTurn"}""")
+        ana.ok("POST", "/api/encounters/$enc/commands", """{"type":"LogAttack","attackerId":"${t.bram}","targetId":"$goblin","hit":true,"damage":3}""")
+        ana.ok("POST", "/api/encounters/$enc/commands", """{"type":"NextTurn"}""")
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"LogAttack","attackerId":"$goblin","targetId":"${t.bram}","hit":true,"damage":4}""")
+
+        t.dm.ok("POST", "/api/encounters/$enc/end")
+        val bram = t.dm.read("/api/campaigns/${t.id}").get("characters").first { it.get("name").asString() == "Bram" }
+        assertEquals(15, bram.get("hp").asInt())
+    }
+
+    @Test
     fun `the DM deletes an encounter`() {
         val t = Table()
         val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Spare"}""")!!.get("id").asString()

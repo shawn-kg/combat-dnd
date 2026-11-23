@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CombatantView, Command, EncounterView } from '../api/types'
 import { AddEnemy } from './AddEnemy'
+import { AddPartyMember } from './AddPartyMember'
 import { Editable } from './Editable'
 import { applyHpEdit } from './hpEdit'
 import { describeAttack, totalLine } from './lastTurn'
@@ -30,7 +31,7 @@ export function Tracker({
 }) {
   const [logFor, setLogFor] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<'enemy' | 'party' | null>(null)
   const [ending, setEnding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef<number | undefined>(undefined)
@@ -90,8 +91,8 @@ export function Tracker({
             <button type="button" className="btn small" onClick={doUndo}>
               ↶ Undo<kbd>U</kbd>
             </button>
-            <button type="button" className="btn small" onClick={() => setAdding(!adding)}>
-              + Add enemies
+            <button type="button" className="btn small" aria-expanded={adding !== null} onClick={() => setAdding(adding ? null : 'enemy')}>
+              + Add
             </button>
             <button type="button" className="btn small" onClick={() => act({ type: 'PreviousTurn' })}>
               ◀ Previous
@@ -108,7 +109,23 @@ export function Tracker({
           {notice}
         </div>
       )}
-      {dm && adding && <AddEnemy view={view} act={act} onClose={() => setAdding(false)} />}
+      {dm && adding && (
+        <>
+          <div className="lrow" role="group" aria-label="What to add">
+            <button type="button" className="chip" aria-pressed={adding === 'enemy'} onClick={() => setAdding('enemy')}>
+              Enemies
+            </button>
+            <button type="button" className="chip" aria-pressed={adding === 'party'} onClick={() => setAdding('party')}>
+              Party member
+            </button>
+          </div>
+          {adding === 'enemy' ? (
+            <AddEnemy view={view} act={act} onClose={() => setAdding(null)} />
+          ) : (
+            <AddPartyMember view={view} act={act} onClose={() => setAdding(null)} />
+          )}
+        </>
+      )}
 
       <div className="colhead" aria-hidden="true">
         <span>Init</span>

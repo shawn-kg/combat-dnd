@@ -1,4 +1,5 @@
 import { parseInitiative } from './initiative'
+import { charactersNotInFight } from './partyMembers'
 import { describe, expect, it } from 'vitest'
 import type { AttackView, LastTurnView } from '../api/types'
 import { applyHpEdit, numberedNames } from './hpEdit'
@@ -76,5 +77,13 @@ describe('parseInitiative', () => {
     expect(parseInitiative(undefined)).toBeNull()
     expect(parseInitiative('12.5')).toBeNull()
     expect(parseInitiative('abc')).toBeNull()
+  })
+})
+
+describe('charactersNotInFight', () => {
+  const ch = (id: string, name: string) => ({ id, name, portraitKey: null, ac: 15, hp: 20, maxHp: 20, playerId: null, playerName: null })
+  it('offers only characters whose id is not already a combatant', () => {
+    const view = { combatants: [{ id: 'lyra' }, { id: 'goblin-1' }] } as unknown as Parameters<typeof charactersNotInFight>[1]
+    expect(charactersNotInFight([ch('lyra', 'Lyra'), ch('bram', 'Bram')], view).map((c) => c.name)).toEqual(['Bram'])
   })
 })
