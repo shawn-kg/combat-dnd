@@ -81,6 +81,17 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
             else -> ok(Event.CombatantAdded(cmd.combatant))
         }
 
+        is Command.AddCombatants -> {
+            val ids = cmd.combatants.map { it.id }
+            when {
+                !isDm -> forbidden(DM_ONLY)
+                cmd.combatants.isEmpty() -> invalid("Add at least one.")
+                ids.toSet().size != ids.size || ids.any { it in state.combatants } -> invalid("Each combatant needs its own id.")
+                cmd.combatants.any { it.maxHp <= 0 } -> invalid("Max HP must be above 0.")
+                else -> Decision.Accepted(cmd.combatants.map(Event::CombatantAdded))
+            }
+        }
+
         is Command.RemoveCombatant -> when {
             !isDm -> forbidden(DM_ONLY)
             cmd.id !in state.combatants -> invalid("Unknown combatant.")

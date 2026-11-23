@@ -65,7 +65,7 @@ docker compose up -d && cd backend && RUN_DB_TESTS=true ./gradlew test
 ```
 
 ```bash
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 ```
 
 ## Roadmap
@@ -75,7 +75,9 @@ cd frontend && npm run lint && npm run build
    previous turn, DM edits to any field, add, remove, reveal, defeat, reorder, per-viewer filtering.
 3. ~~Tracker API~~: event log in Postgres, commands with version checks (409), undo, live updates over SSE,
    per-viewer filtering, the CSRF header check, dev seed data and `?as=` sign-in.
-4. Tracker screen: rows, DM inline editing, Log attack dialog, turn log.
+4. ~~Tracker screen~~: players log attacks and end their turn from one panel; the DM edits any field inline,
+   logs for anyone, reveals, defeats, removes, adds enemies (as one undoable action), fixes entries in the
+   turn log, and has Previous, Next and Undo (N and U keys).
 5. Campaign, join, lobby and choosing a character; characters and templates; portrait uploads.
 6. Encounter prep.
 7. Deploy to Fly.io and run a test session.

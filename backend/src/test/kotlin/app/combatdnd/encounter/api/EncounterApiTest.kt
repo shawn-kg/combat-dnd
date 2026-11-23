@@ -73,10 +73,13 @@ class EncounterApiTest(
         assertNull(forLyra.combatant("archer"))
         assertEquals("lyra", forLyra.get("currentId").asString())
         assertTrue(forLyra.combatant("lyra")!!.get("controlledByViewer").asBoolean())
+        assertTrue(!forLyra.get("viewerIsDm").asBoolean())
+        assertEquals("Goblin Ambush (test)", forLyra.get("name").asString())
 
         val forDm = state(id, dm)
         assertEquals(22, forDm.combatant("boss")!!.get("hp").asInt())
         assertNotNull(forDm.combatant("archer"))
+        assertTrue(forDm.get("viewerIsDm").asBoolean())
         assertEquals(2, forDm.combatant("boss")!!.get("lastTurn").get("attacks").size())
     }
 
@@ -92,6 +95,20 @@ class EncounterApiTest(
         assertEquals(200, undo.statusCode(), undo.body())
         assertEquals(22, state(id, dm).combatant("boss")!!.get("hp").asInt())
         assertTrue(state(id, dm).combatant("lyra")!!.get("lastTurn").isNull)
+    }
+
+    @Test
+    fun `a group of enemies is added in one command and removed with one undo`() {
+        val id = seed.newAmbush()
+        val wolf = { n: Int -> """{"id":"wolf$n","name":"Wolf $n","side":"ENEMY","initiative":17,"ac":13,"hp":11,"maxHp":11}""" }
+        val res = command(id, dm, """{"type":"AddCombatants","combatants":[${wolf(1)},${wolf(2)}]}""")
+        assertEquals(200, res.statusCode(), res.body())
+        assertNotNull(state(id, dm).combatant("wolf2"))
+
+        assertEquals(200, post("/api/encounters/$id/undo", dm, "").statusCode())
+        val after = state(id, dm)
+        assertNull(after.combatant("wolf1"))
+        assertNull(after.combatant("wolf2"))
     }
 
     @Test

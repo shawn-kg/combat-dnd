@@ -203,6 +203,19 @@ class DmEditingTest {
     }
 
     @Test
+    fun `several enemies are added as one command, so one undo removes them all`() {
+        val wolves = (1..3).map { Combatant(CombatantId("wolf$it"), "Wolf $it", Side.ENEMY, Controller.Dm, 17, 13, 11, 11) }
+        val d = decide(ambush(), Command.AddCombatants(wolves), Actor.Dm)
+        assertIs<Decision.Accepted>(d)
+        assertEquals(3, d.events.size)
+        val s = d.events.fold(ambush(), ::evolve)
+        assertEquals(listOf(BOSS, CombatantId("wolf1"), CombatantId("wolf2"), CombatantId("wolf3"), LYRA), s.order.take(5))
+
+        assertIs<Decision.Rejected>(decide(ambush(), Command.AddCombatants(wolves), lyraActor))
+        assertIs<Decision.Rejected>(decide(s, Command.AddCombatants(wolves.take(1)), Actor.Dm)) // id already used
+    }
+
+    @Test
     fun `revealing makes a hidden enemy visible and able to take turns`() {
         val s = ambush(current = GOB1).run(Actor.Dm to Command.RevealCombatant(ARCHER), Actor.Dm to Command.NextTurn)
         assertEquals(ARCHER, s.currentId)

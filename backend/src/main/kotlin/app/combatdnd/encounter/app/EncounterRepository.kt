@@ -13,6 +13,9 @@ class EncounterRepository(private val jdbc: JdbcClient, private val codec: Event
     fun exists(encounterId: UUID): Boolean =
         jdbc.sql("select count(*) from encounter where id = ?").param(encounterId).query(Long::class.java).single() > 0
 
+    fun name(encounterId: UUID): String =
+        jdbc.sql("select name from encounter where id = ?").param(encounterId).query(String::class.java).single()
+
     fun version(encounterId: UUID): Long =
         jdbc.sql("select version from encounter where id = ?").param(encounterId).query(Long::class.java).single()
 

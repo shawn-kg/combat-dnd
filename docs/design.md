@@ -130,7 +130,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView
 
 - `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn. Before combat (prep and initiative), a player may also set their own character's current HP.
 - Current state is `events.fold(initial, ::evolve)`. Undo marks the last event undone and replays.
-- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
+- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `AddCombatants` (several as one undoable action), `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
 - `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
 - Party HP is written back to `character.current_hp`, so it carries over to the next fight.
 

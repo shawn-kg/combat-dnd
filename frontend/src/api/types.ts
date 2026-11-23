@@ -1,5 +1,4 @@
-// Mirrors the Kotlin EncounterView (backend/.../encounter/domain/View.kt).
-// Once the API exposes an OpenAPI spec, scripts/gen-api.sh generates these instead.
+// Mirrors EncounterViewDto in backend/.../encounter/api/EncounterDtos.kt.
 
 export type Side = 'PARTY' | 'ENEMY'
 
@@ -40,6 +39,9 @@ export interface CombatantView {
 }
 
 export interface EncounterView {
+  name: string
+  /** Decides which controls to show; the server still checks every command. */
+  viewerIsDm: boolean
   round: number
   currentId: string | null
   version: number
@@ -47,3 +49,6 @@ export interface EncounterView {
   /** Newest first. */
   attacks: AttackView[]
 }
+
+/** A tracker command, e.g. { type: 'LogAttack', attackerId, targetId, hit, damage }. */
+export type Command = { type: string } & Record<string, unknown>

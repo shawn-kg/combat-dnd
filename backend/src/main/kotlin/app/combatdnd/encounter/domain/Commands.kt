@@ -23,6 +23,9 @@ sealed interface Command {
     /** DM only from here down. */
     data class AddCombatant(val combatant: Combatant) : Command
 
+    /** Several at once ("Goblin × 3"), so one Undo removes them all. */
+    data class AddCombatants(val combatants: List<Combatant>) : Command
+
     data class RemoveCombatant(val id: CombatantId) : Command
 
     data class RevealCombatant(val id: CombatantId) : Command

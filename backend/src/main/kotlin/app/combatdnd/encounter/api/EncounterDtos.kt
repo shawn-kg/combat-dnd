@@ -17,6 +17,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 // ---------- what the client receives (mirrors frontend/src/api/types.ts) ----------
 
 data class EncounterViewDto(
+    val name: String,
+    val viewerIsDm: Boolean,
     val round: Int,
     val currentId: String?,
     val version: Long,
@@ -52,7 +54,8 @@ data class AttackViewDto(
     val damage: Int,
 )
 
-fun EncounterView.toDto() = EncounterViewDto(round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
+fun EncounterView.toDto(name: String) =
+    EncounterViewDto(name, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
     id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),
@@ -72,6 +75,7 @@ private fun AttackView.toDto() = AttackViewDto(id.value, round, attackerId.value
     JsonSubTypes.Type(CommandRequest.NextTurn::class, name = "NextTurn"),
     JsonSubTypes.Type(CommandRequest.PreviousTurn::class, name = "PreviousTurn"),
     JsonSubTypes.Type(CommandRequest.AddCombatant::class, name = "AddCombatant"),
+    JsonSubTypes.Type(CommandRequest.AddCombatants::class, name = "AddCombatants"),
     JsonSubTypes.Type(CommandRequest.RemoveCombatant::class, name = "RemoveCombatant"),
     JsonSubTypes.Type(CommandRequest.RevealCombatant::class, name = "RevealCombatant"),
     JsonSubTypes.Type(CommandRequest.SetDefeated::class, name = "SetDefeated"),
@@ -123,20 +127,13 @@ sealed interface CommandRequest {
         val hidden: Boolean = false,
         override val expectedVersion: Long? = null,
     ) : CommandRequest {
-        override fun toCommand() = Command.AddCombatant(
-            Combatant(
-                id = CombatantId(id),
-                name = name,
-                side = side,
-                controller = playerId?.let { Controller.Player(PlayerId(it)) } ?: Controller.Dm,
-                initiative = initiative,
-                ac = ac,
-                hp = hp,
-                maxHp = maxHp,
-                portraitKey = portraitKey,
-                hidden = hidden,
-            ),
-        )
+        override fun toCommand() =
+            Command.AddCombatant(NewCombatant(id, name, side, playerId, initiative, ac, hp, maxHp, portraitKey, hidden).toCombatant())
+    }
+
+    /** Several at once, as one command, so one Undo removes them all. */
+    data class AddCombatants(val combatants: List<NewCombatant>, override val expectedVersion: Long? = null) : CommandRequest {
+        override fun toCommand() = Command.AddCombatants(combatants.map { it.toCombatant() })
     }
 
     data class RemoveCombatant(val id: String, override val expectedVersion: Long? = null) : CommandRequest {
@@ -167,6 +164,34 @@ sealed interface CommandRequest {
     data class Reorder(val order: List<String>, override val expectedVersion: Long? = null) : CommandRequest {
         override fun toCommand() = Command.Reorder(order.map(::CombatantId))
     }
+}
+
+/** One combatant to add. A plain shape (no "type"), so it can sit inside AddCombatants' list. */
+data class NewCombatant(
+    val id: String,
+    val name: String,
+    val side: Side,
+    /** The player who controls it; null for enemies and DM-run allies. */
+    val playerId: String? = null,
+    val initiative: Int,
+    val ac: Int,
+    val hp: Int,
+    val maxHp: Int,
+    val portraitKey: String? = null,
+    val hidden: Boolean = false,
+) {
+    fun toCombatant() = Combatant(
+        id = CombatantId(id),
+        name = name,
+        side = side,
+        controller = playerId?.let { Controller.Player(PlayerId(it)) } ?: Controller.Dm,
+        initiative = initiative,
+        ac = ac,
+        hp = hp,
+        maxHp = maxHp,
+        portraitKey = portraitKey,
+        hidden = hidden,
+    )
 }
 
 data class VersionResponse(val version: Long)
