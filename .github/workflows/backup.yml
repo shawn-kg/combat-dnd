@@ -19,8 +19,8 @@ jobs:
             echo "::warning::No DATABASE_URL secret yet, so there's nothing to back up."
             exit 0
           fi
-          # pg_dump must be at least the server's version; Neon runs Postgres 17.
-          docker run --rm -e DATABASE_URL postgres:17 sh -c 'pg_dump --format=custom --no-owner "$DATABASE_URL"' > combat-dnd.dump
+          # pg_dump refuses to dump a newer server, but dumps older ones fine, so use the newest major version.
+          docker run --rm -e DATABASE_URL postgres:18 sh -c 'pg_dump --format=custom --no-owner "$DATABASE_URL"' > combat-dnd.dump
           ls -l combat-dnd.dump
           test -s combat-dnd.dump
       - uses: actions/upload-artifact@v4
