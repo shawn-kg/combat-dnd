@@ -30,6 +30,8 @@ export interface CombatantView {
   initiative: number
   isCurrent: boolean
   controlledByViewer: boolean
+  /** A player runs it, rather than the DM. */
+  runByPlayer: boolean
   ac: number | null
   hp: number | null
   maxHp: number | null

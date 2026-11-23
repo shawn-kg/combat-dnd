@@ -39,6 +39,7 @@ data class CombatantViewDto(
     val initiative: Int,
     val isCurrent: Boolean,
     val controlledByViewer: Boolean,
+    val runByPlayer: Boolean,
     val ac: Int?,
     val hp: Int?,
     val maxHp: Int?,
@@ -63,7 +64,7 @@ fun EncounterView.toDto(h: Header) =
     EncounterViewDto(h.campaignId.toString(), h.name, h.status, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
-    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),
+    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, runByPlayer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),
 )
 
 private fun LastTurnView.toDto() = LastTurnDto(round, hits, misses, damage, attacks.map { it.toDto() })
@@ -87,6 +88,7 @@ private fun AttackView.toDto() = AttackViewDto(id.value, round, attackerId.value
     JsonSubTypes.Type(CommandRequest.EditCombatant::class, name = "EditCombatant"),
     JsonSubTypes.Type(CommandRequest.Reorder::class, name = "Reorder"),
     JsonSubTypes.Type(CommandRequest.SetInitiatives::class, name = "SetInitiatives"),
+    JsonSubTypes.Type(CommandRequest.RollInitiative::class, name = "RollInitiative"),
 )
 sealed interface CommandRequest {
     val expectedVersion: Long?
@@ -169,6 +171,11 @@ sealed interface CommandRequest {
 
     data class Reorder(val order: List<String>, override val expectedVersion: Long? = null) : CommandRequest {
         override fun toCommand() = Command.Reorder(order.map(::CombatantId))
+    }
+
+    /** A player's own roll before round 1: {"type":"RollInitiative","id":"<combatant id>","initiative":17} */
+    data class RollInitiative(val id: String, val initiative: Int, override val expectedVersion: Long? = null) : CommandRequest {
+        override fun toCommand() = Command.RollInitiative(CombatantId(id), initiative)
     }
 
     /** {"type":"SetInitiatives","initiatives":{"<combatant id>": 17, ...}} */

@@ -70,6 +70,8 @@ fun evolve(state: EncounterState, event: Event): EncounterState {
 
         is Event.Reordered -> state.copy(order = event.order)
 
+        is Event.InitiativeRolled -> state.update(event.id) { it.copy(initiative = event.initiative) }
+
         is Event.InitiativesSet -> {
             val set = event.initiatives.entries.fold(state) { s, (id, init) -> s.update(id) { it.copy(initiative = init) } }
             set.copy(order = sortByInitiative(set))

@@ -207,6 +207,19 @@ class DmEditingTest {
     }
 
     @Test
+    fun `players roll their own initiative before round 1, without re-sorting the list`() {
+        val rolling = ambush(current = null)
+        val s = rolling.run(lyraActor to Command.RollInitiative(LYRA, 2))
+        assertEquals(2, s.combatant(LYRA).initiative)
+        assertEquals(rolling.order, s.order) // the DM sorts when everyone's in
+        assertIs<Decision.Rejected>(decide(rolling, Command.RollInitiative(LYRA, 9), bramActor)) // not Bram's character
+        assertIs<Decision.Rejected>(decide(rolling, Command.RollInitiative(BOSS, 9), lyraActor))
+        // Once turns are running, only the DM changes initiative.
+        assertIs<Decision.Rejected>(decide(ambush(), Command.RollInitiative(LYRA, 9), lyraActor))
+        assertIs<Decision.Accepted>(decide(ambush(), Command.RollInitiative(LYRA, 9), Actor.Dm))
+    }
+
+    @Test
     fun `setting everyone's initiative sorts once, keeping ties in their current order`() {
         val s = ambush().run(
             Actor.Dm to Command.SetInitiatives(mapOf(BOSS to 10, LYRA to 18, GOB1 to 10, ARCHER to 5, BRAM to 18)),

@@ -101,7 +101,11 @@ class EncounterLifecycleApiTest(@Autowired private val env: Environment, @Autowi
         assertTrue(t.player.read("/api/encounters/$enc/state").combatant("Lyra").get("controlledByViewer").asBoolean())
 
         val ids = rolling.get("combatants").associate { it.get("name").asString() to it.get("id").asString() }
-        val inits = mapOf("Lyra" to 17, "Goblin 1" to 12, "Goblin 2" to 20, "Goblin Boss" to 5)
+        // The player rolls for Lyra; it shows up on the DM's screen. They can't roll for anyone else.
+        t.player.ok("POST", "/api/encounters/$enc/commands", """{"type":"RollInitiative","id":"${t.lyra}","initiative":17}""")
+        assertEquals(17, t.dm.read("/api/encounters/$enc/state").combatant("Lyra").get("initiative").asInt())
+        assertEquals(403, t.player.post("/api/encounters/$enc/commands", """{"type":"RollInitiative","id":"${ids["Goblin 1"]}","initiative":1}""").statusCode())
+        val inits = mapOf("Goblin 1" to 12, "Goblin 2" to 20, "Goblin Boss" to 5)
         val body = inits.entries.joinToString(",", "{\"type\":\"SetInitiatives\",\"initiatives\":{", "}}") { "\"${ids[it.key]}\":${it.value}" }
         t.dm.ok("POST", "/api/encounters/$enc/commands", body)
         assertEquals(
@@ -114,6 +118,7 @@ class EncounterLifecycleApiTest(@Autowired private val env: Environment, @Autowi
         assertEquals("ACTIVE", active.get("status").asString())
         assertEquals(1, active.get("round").asInt())
         assertEquals(ids["Goblin 2"], active.get("currentId").asString())
+        assertEquals(403, t.player.post("/api/encounters/$enc/commands", """{"type":"RollInitiative","id":"${t.lyra}","initiative":30}""").statusCode())
 
         // Goblin 2 hits Lyra for 5, then it's Lyra's turn.
         t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"LogAttack","attackerId":"${ids["Goblin 2"]}","targetId":"${t.lyra}","hit":true,"damage":5}""")

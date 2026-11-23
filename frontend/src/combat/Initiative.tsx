@@ -68,7 +68,8 @@ export function Initiative({
           <Steps on="initiative" />
         </div>
         <p className="muted small">
-          Type everyone’s roll, then sort. Use the arrows to break ties. Players see the tracker once you begin.
+          Players can send their own rolls; they appear here as they come in. Type the rest (you can type over any roll), then
+          sort. Use the arrows to break ties. Players see the tracker once you begin.
         </p>
         <div className="lrow">
           <button type="button" className="btn small" disabled={busy} onClick={sort}>
@@ -85,7 +86,15 @@ export function Initiative({
             <span className="grow">
               <span className="nm">{c.name}</span> {c.hidden && <span className="tag">Hidden</span>}
               <br />
-              <span className="muted small">{c.side === 'ENEMY' ? 'Enemy' : c.controlledByViewer ? 'Run by you' : 'Party'}</span>
+              <span className="muted small">
+                {c.side === 'ENEMY'
+                  ? 'Enemy'
+                  : !c.runByPlayer
+                    ? 'Party · run by you'
+                    : c.initiative !== 0 && draft[c.id] === undefined
+                      ? 'Rolled by their player'
+                      : 'Waiting for their player (or type it)'}
+              </span>
             </span>
             <input
               type="number"

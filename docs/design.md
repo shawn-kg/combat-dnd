@@ -64,7 +64,7 @@ Everything the DM sets up is saved, so starting a fight takes seconds.
 ### Starting combat
 
 1. The DM opens a saved encounter and presses **Start combat**. The roster becomes a list of combatants; repeated enemies are numbered (Goblin 1, Goblin 2).
-2. **Initiative:** the DM types everyone's roll, presses **Sort by initiative**, and uses the up and down arrows to break ties. Players see "Rolling initiative" until then.
+2. **Initiative:** each player can send their own roll from the "Rolling initiative" screen; it appears on the DM's screen as it comes in. The DM types the rest (and can type over any roll), presses **Sort by initiative**, and uses the up and down arrows to break ties. Once round 1 begins, only the DM can change initiative.
 3. **Begin round 1** puts the list in that order and highlights the first combatant who isn't hidden.
 
 ### Running combat
@@ -130,7 +130,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView
 
 - `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn. A player may also set their own character's current HP at any time, but not their AC, max HP or anyone else's numbers.
 - Current state is `events.fold(initial, ::evolve)`. Undo marks the last event undone and replays.
-- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `AddCombatants` (several as one undoable action), `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `SetInitiatives` (everyone's roll at once, then a stable sort, so ties keep their order), `Reorder`, `Undo`.
+- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `AddCombatants` (several as one undoable action), `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `RollInitiative` (one roll, no re-sort; players may send their own before round 1), `SetInitiatives` (everyone's roll at once, then a stable sort, so ties keep their order), `Reorder`, `Undo`.
 - `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
 - Party HP is written back to `character.current_hp` when the fight ends, so it carries over to the next one.
 
@@ -242,4 +242,3 @@ Open questions:
 
 - [ ] Should players see a health band for enemies (Healthy, Bloodied, Down) instead of nothing?
 - [ ] Should healing be logged like attacks, so the last-turn line can say "Healed Bram · 7"?
-- [ ] Should players type their own initiative at the start of combat, or is DM entry enough?

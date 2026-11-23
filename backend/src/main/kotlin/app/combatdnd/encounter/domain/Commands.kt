@@ -49,6 +49,12 @@ sealed interface Command {
      */
     data class SetInitiatives(val initiatives: Map<CombatantId, Int>) : Command
 
+    /**
+     * One combatant's initiative roll, typed by their player (or the DM) before round 1. Unlike EditCombatant
+     * it doesn't re-sort, so rows don't jump while the DM is typing; the DM sorts when everyone's in.
+     */
+    data class RollInitiative(val id: CombatantId, val initiative: Int) : Command
+
     /** Manual order, e.g. to break an initiative tie. Must list every combatant once. */
     data class Reorder(val order: List<CombatantId>) : Command
 }

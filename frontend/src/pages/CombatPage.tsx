@@ -1,5 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Initiative } from '../combat/Initiative'
+import { PlayerInitiative } from '../combat/PlayerInitiative'
 import { Tracker } from '../combat/Tracker'
 import { useEncounter } from '../combat/useEncounter'
 
@@ -58,10 +59,7 @@ export function CombatPage() {
         {view.viewerIsDm ? (
           <Initiative view={view} send={send} begin={begin} />
         ) : (
-          <div className="wait-card">
-            <b>Rolling initiative…</b>
-            Roll for {view.name} and tell the DM. The tracker appears here when round 1 begins.
-          </div>
+          <PlayerInitiative view={view} send={send} />
         )}
       </main>
     )

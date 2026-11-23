@@ -20,6 +20,8 @@ data class CombatantView(
     val initiative: Int,
     val isCurrent: Boolean,
     val controlledByViewer: Boolean,
+    /** A player runs it (vs. the DM), e.g. to show who still has to send their initiative. */
+    val runByPlayer: Boolean,
     val ac: Int?,
     val hp: Int?,
     val maxHp: Int?,
@@ -65,6 +67,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
                 initiative = c.initiative,
                 isCurrent = c.id == state.currentId,
                 controlledByViewer = !isDm && viewer.controls(c),
+                runByPlayer = c.controller is Controller.Player,
                 ac = if (seesStats) c.ac else null,
                 hp = if (seesStats) c.hp else null,
                 maxHp = if (seesStats) c.maxHp else null,
