@@ -46,8 +46,11 @@ When it prints **Ready**, open the two links it shows: one DM tab and one player
 - `./scripts/dev.sh --no-docker` uses a Postgres you run yourself on port 5432 (database `combat_dnd`,
   user `combat`, password `combat`).
 
-The backend runs with the **dev** profile: it seeds a campaign and a goblin fight mid-combat, and `?as=dm` or
-`?as=player:<id>` in the URL picks who you are until joining exists.
+To try campaigns, open http://localhost:5173, start a campaign as the DM, and open its join link in a private
+window (or another browser) to join as a player. Each browser keeps its own sign-in.
+
+The backend runs with the **dev** profile, which also seeds a goblin fight mid-combat that you can open with
+`?as=dm` or `?as=player:<id>` (the two links the script prints) until encounters arrive in milestone 4.
 
 <details>
 <summary>Running the pieces by hand</summary>
@@ -94,6 +97,7 @@ cd frontend && npm run lint && npm test && npm run build
 4. ~~Tracker screen~~: players log attacks and end their turn from one panel; the DM edits any field inline,
    logs for anyone, reveals, defeats, removes, adds enemies (as one undoable action), fixes entries in the
    turn log, and has Previous, Next and Undo (N and U keys).
-5. Campaign, join, lobby and choosing a character; characters and templates; portrait uploads.
+5. Campaigns and people: ~~start a campaign, join link, DM approval, choosing a character once, the DM's
+   characters, players setting their own HP, sign-in cookies~~ (3a); monster templates and portrait uploads (3b).
 6. Encounter prep.
 7. Deploy to Fly.io and run a test session.

@@ -32,5 +32,8 @@ class ApiErrors {
     fun notSignedIn(e: NotSignedIn) = error(HttpStatus.UNAUTHORIZED, e.message)
 
     @ExceptionHandler
+    fun api(e: ApiException) = error(e.status, e.message)
+
+    @ExceptionHandler
     fun unreadable(e: HttpMessageNotReadableException) = error(HttpStatus.BAD_REQUEST, "That request isn't valid JSON for this command.")
 }

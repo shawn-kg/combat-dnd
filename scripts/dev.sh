@@ -115,9 +115,10 @@ done
 ENCOUNTER=00000000-0000-4000-8000-0000000000a1
 LYRA=00000000-0000-4000-8000-00000000017a
 echo
-say "Ready. Open these in two browser tabs:"
-echo "      DM:     http://localhost:5173/combat/$ENCOUNTER?as=dm"
-echo "      Player: http://localhost:5173/combat/$ENCOUNTER?as=player:$LYRA"
+say "Ready."
+echo "      Campaigns:          http://localhost:5173  (join as a player from a private window)"
+echo "      Seeded fight, DM:   http://localhost:5173/combat/$ENCOUNTER?as=dm"
+echo "      Seeded fight, Lyra: http://localhost:5173/combat/$ENCOUNTER?as=player:$LYRA"
 say "Press Ctrl+C to stop everything."
 echo
 wait
