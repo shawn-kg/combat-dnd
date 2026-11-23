@@ -30,6 +30,8 @@ export interface CombatantView {
   initiative: number
   isCurrent: boolean
   controlledByViewer: boolean
+  /** A player runs it, rather than the DM. */
+  runByPlayer: boolean
   ac: number | null
   hp: number | null
   maxHp: number | null
@@ -38,9 +40,13 @@ export interface CombatantView {
   lastTurn: LastTurnView | null
 }
 
+/** PREPARING: the DM is setting it up. ROLLING_INITIATIVE: on the tracker, initiative going in. ACTIVE: turns running. ENDED: over. */
+export type EncounterStatus = 'PREPARING' | 'ROLLING_INITIATIVE' | 'ACTIVE' | 'ENDED'
+
 export interface EncounterView {
   campaignId: string
   name: string
+  status: EncounterStatus
   /** Decides which controls to show; the server still checks every command. */
   viewerIsDm: boolean
   round: number

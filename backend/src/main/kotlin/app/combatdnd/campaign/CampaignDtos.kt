@@ -1,6 +1,7 @@
 package app.combatdnd.campaign
 
 import app.combatdnd.auth.PlayerStatus
+import app.combatdnd.encounter.app.EncounterSummary
 import java.util.UUID
 
 // ---------- requests ----------
@@ -64,4 +65,6 @@ data class CampaignView(
     val characters: List<CharacterDto>,
     val me: PlayerDto?,
     val templates: List<TemplateDto> = emptyList(),
+    /** The DM sees every encounter, newest first; players only see fights that are under way. */
+    val encounters: List<EncounterSummary> = emptyList(),
 )

@@ -3,6 +3,7 @@ package app.combatdnd.campaign
 import app.combatdnd.auth.NotSignedIn
 import app.combatdnd.auth.PlayerStatus
 import app.combatdnd.auth.Session
+import app.combatdnd.encounter.app.EncounterRepository
 import app.combatdnd.portrait.PortraitService
 import app.combatdnd.web.BadRequest
 import app.combatdnd.web.Conflict
@@ -16,7 +17,12 @@ import java.security.SecureRandom
 import java.util.UUID
 
 @Service
-class CampaignService(private val repo: CampaignRepository, private val session: Session, private val portraits: PortraitService) {
+class CampaignService(
+    private val repo: CampaignRepository,
+    private val session: Session,
+    private val portraits: PortraitService,
+    private val encounters: EncounterRepository,
+) {
     companion object {
         /** No 0/O or 1/I/L, so a code read aloud or typed from a phone gets through. */
         private const val CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -61,13 +67,15 @@ class CampaignService(private val repo: CampaignRepository, private val session:
 
         if (session.isDm(req, campaignId)) {
             val templates = repo.templates(campaignId).map { TemplateDto(it.id, it.name, it.portraitKey, it.ac, it.maxHp) }
-            return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null, templates = templates)
+            return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null, templates = templates,
+                encounters = encounters.campaignEncounters(campaignId))
         }
         val me = session.player(req, campaignId) ?: throw session.notInCampaign(req, campaignId)
         if (me.status == PlayerStatus.REMOVED) throw NotSignedIn("The DM removed you from this campaign. Ask for the link again.")
         val meDto = PlayerDto(me.id, me.name, me.status, claimed[me.id])
         val visibleCharacters = if (me.status == PlayerStatus.APPROVED) characters.map(toDto) else emptyList()
-        return CampaignView(c.id, c.name, "PLAYER", null, listOf(meDto), visibleCharacters, meDto)
+        val fights = if (me.status == PlayerStatus.APPROVED) encounters.campaignEncounters(campaignId).filter { it.status.running } else emptyList()
+        return CampaignView(c.id, c.name, "PLAYER", null, listOf(meDto), visibleCharacters, meDto, encounters = fights)
     }
 
     /** Campaigns this browser belongs to, for the home page. */

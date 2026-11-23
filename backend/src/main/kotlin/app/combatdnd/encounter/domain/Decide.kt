@@ -17,7 +17,8 @@ private const val DM_ONLY = "Only the DM can do that."
  * May this actor do this now, and what happens if so?
  *
  * The DM may do anything. A player may log attacks for their own character during its turn,
- * fix their own entries from that turn, end their own turn, and set their own character's HP at any time.
+ * fix their own entries from that turn, end their own turn, set their own character's HP at any time,
+ * and roll their own initiative before round 1 begins.
  */
 fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
     val isDm = actor == Actor.Dm
@@ -126,6 +127,22 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
                 cmd.ac != null && cmd.ac < 0 -> invalid("AC can't be negative.")
                 else -> ok(Event.CombatantEdited(cmd.id, cmd.name?.trim(), cmd.portraitKey, cmd.initiative, cmd.ac, cmd.hp, cmd.maxHp))
             }
+        }
+
+        is Command.RollInitiative -> {
+            val c = state.combatants[cmd.id] ?: return invalid("Unknown combatant.")
+            when {
+                !actor.controls(c) -> forbidden("You can only roll for your own character.")
+                !isDm && state.currentId != null -> forbidden("Combat has started, so initiative is set. Ask the DM to change it.")
+                else -> ok(Event.InitiativeRolled(cmd.id, cmd.initiative))
+            }
+        }
+
+        is Command.SetInitiatives -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.initiatives.isEmpty() -> invalid("Enter at least one initiative.")
+            cmd.initiatives.keys.any { it !in state.combatants } -> invalid("Unknown combatant.")
+            else -> ok(Event.InitiativesSet(cmd.initiatives))
         }
 
         is Command.Reorder -> when {

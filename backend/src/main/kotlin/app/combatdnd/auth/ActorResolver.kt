@@ -23,6 +23,12 @@ class ActorResolver(
         return session.actorFor(request, campaignId)
     }
 
+    /** Who is asking about a campaign (rather than an encounter); same dev shortcut. */
+    fun resolveForCampaign(request: HttpServletRequest, campaignId: UUID): Actor {
+        if (devSignIn) devActor(request)?.let { return it }
+        return session.actorFor(request, campaignId)
+    }
+
     /**
      * Development only (combat.dev-sign-in, on in the dev profile): `?as=dm` or `?as=player:<uuid>`,
      * or the X-Dev-Actor header, so the seeded encounter works without joining a campaign.

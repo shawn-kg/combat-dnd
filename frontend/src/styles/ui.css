@@ -49,6 +49,11 @@ kbd {
   font-weight: 500;
   cursor: pointer;
 }
+.chip[aria-pressed='true'] {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  font-weight: 600;
+}
 .chip.hitc[aria-pressed='true'] {
   border-color: var(--hp-high);
   color: var(--hp-high);
@@ -139,4 +144,62 @@ kbd {
 .notice.ok {
   border-color: var(--hp-high);
   background: color-mix(in srgb, var(--hp-high) 10%, var(--surface));
+}
+a.btn {
+  text-decoration: none;
+  display: inline-block;
+  color: var(--text);
+}
+a.btn.primary {
+  color: var(--on-gold);
+}
+
+/* Prep → Initiative → Combat */
+.steps {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+}
+.steps span {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+.steps span.on {
+  background: var(--gold);
+  color: var(--on-gold);
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stepper button {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  font-weight: 700;
+  cursor: pointer;
+}
+.stepper button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.err-text {
+  color: var(--hp-low);
+}
+.notice.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-color: var(--gold);
+  background: var(--gold-soft);
 }

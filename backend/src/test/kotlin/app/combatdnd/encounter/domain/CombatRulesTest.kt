@@ -207,6 +207,29 @@ class DmEditingTest {
     }
 
     @Test
+    fun `players roll their own initiative before round 1, without re-sorting the list`() {
+        val rolling = ambush(current = null)
+        val s = rolling.run(lyraActor to Command.RollInitiative(LYRA, 2))
+        assertEquals(2, s.combatant(LYRA).initiative)
+        assertEquals(rolling.order, s.order) // the DM sorts when everyone's in
+        assertIs<Decision.Rejected>(decide(rolling, Command.RollInitiative(LYRA, 9), bramActor)) // not Bram's character
+        assertIs<Decision.Rejected>(decide(rolling, Command.RollInitiative(BOSS, 9), lyraActor))
+        // Once turns are running, only the DM changes initiative.
+        assertIs<Decision.Rejected>(decide(ambush(), Command.RollInitiative(LYRA, 9), lyraActor))
+        assertIs<Decision.Accepted>(decide(ambush(), Command.RollInitiative(LYRA, 9), Actor.Dm))
+    }
+
+    @Test
+    fun `setting everyone's initiative sorts once, keeping ties in their current order`() {
+        val s = ambush().run(
+            Actor.Dm to Command.SetInitiatives(mapOf(BOSS to 10, LYRA to 18, GOB1 to 10, ARCHER to 5, BRAM to 18)),
+        )
+        assertEquals(listOf(LYRA, BRAM, BOSS, GOB1, ARCHER), s.order)
+        assertIs<Decision.Rejected>(decide(ambush(), Command.SetInitiatives(mapOf(LYRA to 20)), lyraActor))
+        assertIs<Decision.Rejected>(decide(ambush(), Command.SetInitiatives(mapOf(CombatantId("nobody") to 3)), Actor.Dm))
+    }
+
+    @Test
     fun `new enemies slot into initiative order`() {
         val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, initiative = 16, ac = 13, hp = 7, maxHp = 7)
         val s = ambush().run(Actor.Dm to Command.AddCombatant(gob))

@@ -428,3 +428,44 @@
   width: 20px;
   height: 20px;
 }
+
+/* ---------- initiative step ---------- */
+.ini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--party);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ini.enemy {
+  border-left-color: var(--enemy);
+}
+.ini .nm {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.ini input.field {
+  width: 64px;
+  text-align: center;
+  font-size: 16px;
+}
+.ini input.missing {
+  border-color: var(--hp-low);
+}
+.end-row {
+  margin-top: 8px;
+}
+.tracker .notice.confirm {
+  margin-top: 8px;
+}
