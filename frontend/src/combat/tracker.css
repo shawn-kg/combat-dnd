@@ -417,3 +417,14 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.chip.with-pic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px;
+}
+.chip.with-pic .mini {
+  width: 20px;
+  height: 20px;
+}

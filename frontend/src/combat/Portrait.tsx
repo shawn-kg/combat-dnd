@@ -5,7 +5,8 @@ import { initials } from './lastTurn'
 export function Portrait({ c, size = 'row' }: { c: Pick<CombatantView, 'name' | 'portraitKey'>; size?: 'row' | 'mini' }) {
   const cls = size === 'mini' ? 'mini' : 'portrait'
   return c.portraitKey ? (
-    <img className={cls} src={`/api/portraits/${encodeURIComponent(c.portraitKey)}`} alt="" />
+    // Keys look like <campaign>/<random>.jpg; the slash is part of the path.
+    <img className={cls} src={`/api/portraits/${c.portraitKey}`} alt="" />
   ) : (
     <span className={`${cls} initials`} aria-hidden="true">
       {initials(c.name)}

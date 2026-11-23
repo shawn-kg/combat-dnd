@@ -17,3 +17,6 @@ frontend/dist/
 # Secrets
 .env
 .env.*
+
+# Uploaded portraits in local development
+backend/data/

@@ -10,6 +10,8 @@ data class CampaignRow(val id: UUID, val name: String, val joinCode: String)
 
 data class PlayerRow(val id: UUID, val campaignId: UUID, val name: String, val status: PlayerStatus)
 
+data class TemplateRow(val id: UUID, val campaignId: UUID, val name: String, val portraitKey: String?, val ac: Int, val maxHp: Int)
+
 data class CharacterRow(
     val id: UUID,
     val campaignId: UUID,
@@ -119,6 +121,34 @@ class CampaignRepository(private val jdbc: JdbcClient) {
     fun unassign(characterId: UUID) {
         jdbc.sql("update character set player_id = null where id = ?").param(characterId).update()
     }
+
+    // ---------- monster templates ----------
+
+    fun templates(campaignId: UUID): List<TemplateRow> =
+        jdbc.sql("select id, campaign_id, name, portrait_key, ac, max_hp from monster_template where campaign_id = ? order by name")
+            .param(campaignId).query(::templateRow).list()
+
+    fun template(campaignId: UUID, id: UUID): TemplateRow? =
+        jdbc.sql("select id, campaign_id, name, portrait_key, ac, max_hp from monster_template where campaign_id = ? and id = ?")
+            .params(campaignId, id).query(::templateRow).optional().orElse(null)
+
+    fun createTemplate(campaignId: UUID, name: String, portraitKey: String?, ac: Int, maxHp: Int): UUID =
+        jdbc.sql("insert into monster_template (campaign_id, name, portrait_key, ac, max_hp) values (?, ?, ?, ?, ?) returning id")
+            .params(listOf(campaignId, name, portraitKey, ac, maxHp)).query(UUID::class.java).single()
+
+    fun updateTemplate(id: UUID, name: String, portraitKey: String?, ac: Int, maxHp: Int) {
+        jdbc.sql("update monster_template set name = ?, portrait_key = ?, ac = ?, max_hp = ? where id = ?")
+            .params(listOf(name, portraitKey, ac, maxHp, id)).update()
+    }
+
+    fun deleteTemplate(id: UUID) {
+        jdbc.sql("delete from monster_template where id = ?").param(id).update()
+    }
+
+    private fun templateRow(rs: ResultSet, @Suppress("UNUSED_PARAMETER") n: Int) = TemplateRow(
+        rs.getObject("id", UUID::class.java), rs.getObject("campaign_id", UUID::class.java), rs.getString("name"),
+        rs.getString("portrait_key"), rs.getInt("ac"), rs.getInt("max_hp"),
+    )
 
     private fun characterRow(rs: ResultSet, @Suppress("UNUSED_PARAMETER") n: Int) = CharacterRow(
         id = rs.getObject("id", UUID::class.java),

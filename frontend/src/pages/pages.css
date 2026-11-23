@@ -177,3 +177,52 @@
   color: var(--party);
   border-color: var(--party);
 }
+/* A portrait you can click to upload a new picture (DM). */
+.portrait-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.portrait-btn {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.portrait-btn .portrait-edit {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  background: var(--gold);
+  color: var(--on-gold);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.portrait-btn:hover .portrait-edit,
+.portrait-btn:focus-visible .portrait-edit,
+.portrait-btn.busy .portrait-edit {
+  opacity: 1;
+}
+.list-row img.mini {
+  border: 2px solid var(--party);
+}
+.list-row.monster .mini {
+  border-color: var(--enemy);
+  background: var(--enemy-bg);
+}
+.pick img.portrait,
+.mine-row img.portrait {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--party);
+}

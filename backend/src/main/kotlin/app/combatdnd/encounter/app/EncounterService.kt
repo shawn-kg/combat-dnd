@@ -35,7 +35,7 @@ class EncounterService(
     private val hub: EncounterHub,
     private val tx: TransactionTemplate,
 ) {
-    private class Loaded(val name: String, var state: EncounterState, var revision: Long)
+    private class Loaded(val name: String, val campaignId: UUID, var state: EncounterState, var revision: Long)
 
     private val cache = ConcurrentHashMap<UUID, Loaded>()
     private val locks = ConcurrentHashMap<UUID, ReentrantLock>()
@@ -44,7 +44,7 @@ class EncounterService(
 
     private fun load(id: UUID): Loaded = cache[id] ?: run {
         if (!repo.exists(id)) throw EncounterNotFound(id)
-        Loaded(repo.name(id), replay(id), repo.version(id)).also { cache[id] = it }
+        Loaded(repo.name(id), repo.campaignId(id), replay(id), repo.version(id)).also { cache[id] = it }
     }
 
     private fun replay(id: UUID) = repo.events(id).fold(EMPTY_ENCOUNTER, ::evolve)
@@ -52,11 +52,11 @@ class EncounterService(
     /** The client-facing version is the encounter's revision, not the internal event count. */
     private fun Loaded.snapshot() = state.copy(version = revision)
 
-    fun view(id: UUID, actor: Actor): EncounterViewDto = locked(id) { load(id).let { viewFor(it.snapshot(), actor).toDto(it.name) } }
+    fun view(id: UUID, actor: Actor): EncounterViewDto = locked(id) { load(id).let { viewFor(it.snapshot(), actor).toDto(it.name, it.campaignId) } }
 
     /** Applies one command and returns the new revision. Throws on a stale version or a rejected command. */
     fun handle(id: UUID, actor: Actor, command: Command, expectedVersion: Long?): Long {
-        val (name, snapshot) = locked(id) {
+        val (meta, snapshot) = locked(id) {
             val loaded = load(id)
             if (expectedVersion != null && expectedVersion != loaded.revision) throw StaleVersion()
             when (val d = decide(loaded.state, command, actor)) {
@@ -69,18 +69,18 @@ class EncounterService(
                     }
                     loaded.state = d.events.fold(loaded.state, ::evolve)
                     loaded.revision = revision
-                    loaded.name to loaded.snapshot()
+                    (loaded.name to loaded.campaignId) to loaded.snapshot()
                 }
             }
         }
-        hub.broadcast(id, snapshot, name)
+        hub.broadcast(id, snapshot, meta.first, meta.second)
         return snapshot.version
     }
 
     /** DM only: reverses the last command (all of its events) by replaying the log without it. */
     fun undo(id: UUID, actor: Actor): Long {
         if (actor != Actor.Dm) throw CommandRejected(Reason.FORBIDDEN, "Only the DM can undo.")
-        val (name, snapshot) = locked(id) {
+        val (meta, snapshot) = locked(id) {
             val loaded = load(id)
             val revision = loaded.revision + 1
             val undone = tx.execute {
@@ -89,9 +89,9 @@ class EncounterService(
             if (!undone) throw CommandRejected(Reason.INVALID, "There is nothing to undo.")
             loaded.state = replay(id)
             loaded.revision = revision
-            loaded.name to loaded.snapshot()
+            (loaded.name to loaded.campaignId) to loaded.snapshot()
         }
-        hub.broadcast(id, snapshot, name)
+        hub.broadcast(id, snapshot, meta.first, meta.second)
         return snapshot.version
     }
 

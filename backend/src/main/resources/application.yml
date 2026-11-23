@@ -8,6 +8,16 @@ spring:
   threads:
     virtual:
       enabled: true
+  servlet:
+    multipart:
+      # Portrait uploads; the server shrinks them to 256 x 256 JPEGs of a few KB.
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+combat:
+  portraits:
+    # Local folder for uploaded portraits. Deployment switches this to Cloudflare R2.
+    dir: ${PORTRAITS_DIR:./data/portraits}
 
 server:
   shutdown: graceful

@@ -20,6 +20,14 @@ export interface CharacterDto {
   playerName: string | null
 }
 
+export interface TemplateDto {
+  id: string
+  name: string
+  portraitKey: string | null
+  ac: number
+  maxHp: number
+}
+
 export interface CampaignView {
   id: string
   name: string
@@ -30,6 +38,8 @@ export interface CampaignView {
   characters: CharacterDto[]
   /** The signed-in player; null for the DM. */
   me: PlayerDto | null
+  /** DM only: monster templates. */
+  templates: TemplateDto[]
 }
 
 export interface MyCampaign {

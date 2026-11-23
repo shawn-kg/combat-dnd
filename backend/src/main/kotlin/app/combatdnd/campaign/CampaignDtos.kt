@@ -21,6 +21,8 @@ data class CharacterRequest(
 
 data class HpRequest(val hp: Int)
 
+data class TemplateRequest(val name: String, val ac: Int, val maxHp: Int, val portraitKey: String? = null)
+
 // ---------- responses ----------
 
 data class CampaignCreated(val id: UUID, val joinCode: String)
@@ -48,7 +50,9 @@ data class CharacterDto(
     val playerName: String?,
 )
 
-/** What a browser sees on a campaign's home page. `joinCode` is only sent to the DM. */
+data class TemplateDto(val id: UUID, val name: String, val portraitKey: String?, val ac: Int, val maxHp: Int)
+
+/** What a browser sees on a campaign's home page. `joinCode` and `templates` are only sent to the DM. */
 data class CampaignView(
     val id: UUID,
     val name: String,
@@ -59,4 +63,5 @@ data class CampaignView(
     /** Empty for a player who isn't approved yet. */
     val characters: List<CharacterDto>,
     val me: PlayerDto?,
+    val templates: List<TemplateDto> = emptyList(),
 )
