@@ -252,3 +252,16 @@ label.prep-row {
 .prep-row.enemy {
   border-left: 3px solid var(--enemy);
 }
+
+@media (max-width: 520px) {
+  .title {
+    font-size: 21px;
+    margin-top: 2px;
+  }
+  .stack {
+    gap: 10px;
+  }
+  .card {
+    padding: 10px;
+  }
+}
