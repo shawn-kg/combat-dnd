@@ -188,7 +188,9 @@ class DmEditingTest {
     fun `players cannot edit, add, reveal or reorder`() {
         val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, 12, 13, 7, 7)
         listOf(
-            Command.EditCombatant(LYRA, hp = 27),
+            Command.EditCombatant(LYRA, ac = 20),
+            Command.EditCombatant(LYRA, hp = 27, maxHp = 40),
+            Command.EditCombatant(BRAM, hp = 1),
             Command.AddCombatant(gob),
             Command.RevealCombatant(ARCHER),
             Command.Reorder(ambush().order.reversed()),
@@ -196,10 +198,32 @@ class DmEditingTest {
     }
 
     @Test
+    fun `players can set their own HP at any time, but nobody else's`() {
+        val notMyTurn = ambush(current = BOSS)
+        val s = notMyTurn.run(lyraActor to Command.EditCombatant(LYRA, hp = 25))
+        assertEquals(25, s.combatant(LYRA).hp)
+        assertIs<Decision.Rejected>(decide(notMyTurn, Command.EditCombatant(LYRA, hp = 99), lyraActor)) // above max
+        assertIs<Decision.Rejected>(decide(notMyTurn, Command.EditCombatant(BOSS, hp = 1), lyraActor))
+    }
+
+    @Test
     fun `new enemies slot into initiative order`() {
         val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, initiative = 16, ac = 13, hp = 7, maxHp = 7)
         val s = ambush().run(Actor.Dm to Command.AddCombatant(gob))
         assertEquals(listOf(BOSS, gob.id, LYRA, GOB1, ARCHER, BRAM), s.order)
+    }
+
+    @Test
+    fun `several enemies are added as one command, so one undo removes them all`() {
+        val wolves = (1..3).map { Combatant(CombatantId("wolf$it"), "Wolf $it", Side.ENEMY, Controller.Dm, 17, 13, 11, 11) }
+        val d = decide(ambush(), Command.AddCombatants(wolves), Actor.Dm)
+        assertIs<Decision.Accepted>(d)
+        assertEquals(3, d.events.size)
+        val s = d.events.fold(ambush(), ::evolve)
+        assertEquals(listOf(BOSS, CombatantId("wolf1"), CombatantId("wolf2"), CombatantId("wolf3"), LYRA), s.order.take(5))
+
+        assertIs<Decision.Rejected>(decide(ambush(), Command.AddCombatants(wolves), lyraActor))
+        assertIs<Decision.Rejected>(decide(s, Command.AddCombatants(wolves.take(1)), Actor.Dm)) // id already used
     }
 
     @Test

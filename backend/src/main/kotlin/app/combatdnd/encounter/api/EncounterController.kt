@@ -20,7 +20,7 @@ class EncounterController(private val service: EncounterService, private val act
     /** This viewer's filtered tracker. */
     @GetMapping("/state")
     fun state(@PathVariable id: UUID, request: HttpServletRequest): EncounterViewDto =
-        service.view(id, actors.resolve(request)).toDto()
+        service.view(id, actors.resolve(request))
 
     /** Every tracker command. Send the version you last saw as `expectedVersion`; a stale one gets 409. */
     @PostMapping("/commands")

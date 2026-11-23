@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { EncounterView } from '../api/types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Command, EncounterView } from '../api/types'
 
 export type SendResult = { ok: true } | { ok: false; message: string }
 
@@ -12,31 +12,51 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
   const asParam = devActor ? `?as=${encodeURIComponent(devActor)}` : ''
   const [view, setView] = useState<EncounterView | null>(null)
   const [connected, setConnected] = useState(false)
+  // The newest version we know of, from a snapshot or a command's reply. A ref, so two commands in a row
+  // (log an attack, then end the turn) don't send a stale version before the next snapshot arrives.
+  const version = useRef(0)
 
   useEffect(() => {
     const source = new EventSource(`/api/encounters/${encounterId}/stream${asParam}`, { withCredentials: true })
-    source.addEventListener('state', (e) => setView(JSON.parse((e as MessageEvent<string>).data)))
+    source.addEventListener('state', (e) => {
+      const next: EncounterView = JSON.parse((e as MessageEvent<string>).data)
+      version.current = Math.max(version.current, next.version)
+      setView((prev) => (prev && prev.version > next.version ? prev : next))
+    })
     source.onopen = () => setConnected(true)
     source.onerror = () => setConnected(false)
     return () => source.close()
   }, [encounterId, asParam])
 
-  /** Sends a combat command with the version we last saw. No optimistic updates: the next snapshot shows the result. */
-  const send = useCallback(
-    async (command: { type: string } & Record<string, unknown>): Promise<SendResult> => {
-      const res = await fetch(`/api/encounters/${encounterId}/commands${asParam}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'combat-dnd' },
-        body: JSON.stringify({ ...command, expectedVersion: view?.version }),
-      })
-      if (res.ok) return { ok: true }
-      if (res.status === 409) return { ok: false, message: 'The table changed. Check and try again.' }
-      const body = await res.json().catch(() => null)
-      return { ok: false, message: body?.message ?? 'Something went wrong.' }
+  const post = useCallback(
+    async (path: 'commands' | 'undo', body?: object): Promise<SendResult> => {
+      try {
+        const res = await fetch(`/api/encounters/${encounterId}/${path}${asParam}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'combat-dnd' },
+          body: body ? JSON.stringify(body) : undefined,
+        })
+        if (res.ok) {
+          const reply = await res.json().catch(() => null)
+          if (typeof reply?.version === 'number') version.current = Math.max(version.current, reply.version)
+          return { ok: true }
+        }
+        if (res.status === 409) return { ok: false, message: 'The table changed. Check and try again.' }
+        const err = await res.json().catch(() => null)
+        return { ok: false, message: err?.message ?? 'Something went wrong. Try again.' }
+      } catch {
+        return { ok: false, message: "Can't reach the server. Check your connection." }
+      }
     },
-    [encounterId, asParam, view?.version],
+    [encounterId, asParam],
   )
 
-  return { view, connected, send }
+  /** Sends a command with the newest version we know of. No optimistic updates: the next snapshot shows the result. */
+  const send = useCallback((command: Command) => post('commands', { ...command, expectedVersion: version.current }), [post])
+
+  /** DM only: reverses the last command. */
+  const undo = useCallback(() => post('undo'), [post])
+
+  return { view, connected, send, undo }
 }

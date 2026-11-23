@@ -30,7 +30,27 @@ fly.toml    One always-on machine (state and SSE live in memory)
 
 ## Run it locally
 
-You need Java 21, Node 22 and Docker.
+You need Java 21, Node 22 and Docker. On WSL the script opens Docker Desktop for you if it isn't running.
+Then, from the repo folder:
+
+```bash
+./scripts/dev.sh
+```
+
+It checks your tools (and says how to fix anything missing), starts Postgres, installs frontend packages when
+needed, and runs the backend and frontend together in one terminal, with each line labelled `[api]` or `[web]`.
+When it prints **Ready**, open the two links it shows: one DM tab and one player tab, which update live.
+**Ctrl+C** stops everything, including Postgres (your data is kept).
+
+- `./scripts/dev.sh --keep-db` leaves Postgres running after Ctrl+C.
+- `./scripts/dev.sh --no-docker` uses a Postgres you run yourself on port 5432 (database `combat_dnd`,
+  user `combat`, password `combat`).
+
+The backend runs with the **dev** profile: it seeds a campaign and a goblin fight mid-combat, and `?as=dm` or
+`?as=player:<id>` in the URL picks who you are until joining exists.
+
+<details>
+<summary>Running the pieces by hand</summary>
 
 ```bash
 docker compose up -d
@@ -44,13 +64,9 @@ cd backend && ./gradlew bootRun
 cd frontend && npm install && npm run dev
 ```
 
-`bootRun` uses the **dev** profile: it seeds a campaign and the goblin ambush mid-fight, and lets you pick who you are
-with `?as=` until joining exists. Open both in two tabs to watch them update live:
+Vite (port 5173) forwards `/api` to Spring on port 8080.
 
-- DM: http://localhost:5173/combat/00000000-0000-4000-8000-0000000000a1?as=dm
-- Player (Lyra): http://localhost:5173/combat/00000000-0000-4000-8000-0000000000a1?as=player:00000000-0000-4000-8000-00000000017a
-
-Vite forwards `/api` to Spring on port 8080.
+</details>
 
 ## Test
 
@@ -65,7 +81,7 @@ docker compose up -d && cd backend && RUN_DB_TESTS=true ./gradlew test
 ```
 
 ```bash
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 ```
 
 ## Roadmap
@@ -75,7 +91,9 @@ cd frontend && npm run lint && npm run build
    previous turn, DM edits to any field, add, remove, reveal, defeat, reorder, per-viewer filtering.
 3. ~~Tracker API~~: event log in Postgres, commands with version checks (409), undo, live updates over SSE,
    per-viewer filtering, the CSRF header check, dev seed data and `?as=` sign-in.
-4. Tracker screen: rows, DM inline editing, Log attack dialog, turn log.
+4. ~~Tracker screen~~: players log attacks and end their turn from one panel; the DM edits any field inline,
+   logs for anyone, reveals, defeats, removes, adds enemies (as one undoable action), fixes entries in the
+   turn log, and has Previous, Next and Undo (N and U keys).
 5. Campaign, join, lobby and choosing a character; characters and templates; portrait uploads.
 6. Encounter prep.
 7. Deploy to Fly.io and run a test session.

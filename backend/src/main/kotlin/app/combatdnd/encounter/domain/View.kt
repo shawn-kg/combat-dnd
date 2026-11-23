@@ -2,6 +2,8 @@ package app.combatdnd.encounter.domain
 
 /** What one viewer is allowed to see. Fields a viewer may not see are null, never just hidden in the UI. */
 data class EncounterView(
+    /** True for the DM; the client uses it to decide which controls to show (the server still checks every command). */
+    val viewerIsDm: Boolean,
     val round: Int,
     val currentId: CombatantId?,
     val version: Long,
@@ -85,5 +87,5 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
         .map(::attackView)
         .reversed()
 
-    return EncounterView(state.round, state.currentId?.takeIf(::visible), state.version, combatants, attacks)
+    return EncounterView(isDm, state.round, state.currentId?.takeIf(::visible), state.version, combatants, attacks)
 }

@@ -11,6 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Lets `docker compose up --wait` (used by scripts/dev.sh) return only once Postgres accepts connections.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U combat -d combat_dnd"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 volumes:
   pgdata:

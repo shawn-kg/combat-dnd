@@ -73,10 +73,13 @@ class EncounterApiTest(
         assertNull(forLyra.combatant("archer"))
         assertEquals("lyra", forLyra.get("currentId").asString())
         assertTrue(forLyra.combatant("lyra")!!.get("controlledByViewer").asBoolean())
+        assertTrue(!forLyra.get("viewerIsDm").asBoolean())
+        assertEquals("Goblin Ambush (test)", forLyra.get("name").asString())
 
         val forDm = state(id, dm)
         assertEquals(22, forDm.combatant("boss")!!.get("hp").asInt())
         assertNotNull(forDm.combatant("archer"))
+        assertTrue(forDm.get("viewerIsDm").asBoolean())
         assertEquals(2, forDm.combatant("boss")!!.get("lastTurn").get("attacks").size())
     }
 
@@ -95,13 +98,28 @@ class EncounterApiTest(
     }
 
     @Test
+    fun `a group of enemies is added in one command and removed with one undo`() {
+        val id = seed.newAmbush()
+        val wolf = { n: Int -> """{"id":"wolf$n","name":"Wolf $n","side":"ENEMY","initiative":17,"ac":13,"hp":11,"maxHp":11}""" }
+        val res = command(id, dm, """{"type":"AddCombatants","combatants":[${wolf(1)},${wolf(2)}]}""")
+        assertEquals(200, res.statusCode(), res.body())
+        assertNotNull(state(id, dm).combatant("wolf2"))
+
+        assertEquals(200, post("/api/encounters/$id/undo", dm, "").statusCode())
+        val after = state(id, dm)
+        assertNull(after.combatant("wolf1"))
+        assertNull(after.combatant("wolf2"))
+    }
+
+    @Test
     fun `permissions come back as 403 with a reason`() {
         val id = seed.newAmbush()
         val notYourTurn = command(id, bram, """{"type":"LogAttack","attackerId":"bram","targetId":"boss","hit":true,"damage":5}""")
         assertEquals(403, notYourTurn.statusCode())
         assertEquals("You can log attacks on your own turn.", json.readTree(notYourTurn.body()).get("message").asString())
 
-        assertEquals(403, command(id, lyra, """{"type":"EditCombatant","id":"lyra","hp":27}""").statusCode())
+        assertEquals(403, command(id, lyra, """{"type":"EditCombatant","id":"lyra","ac":20}""").statusCode())
+        assertEquals(200, command(id, lyra, """{"type":"EditCombatant","id":"lyra","hp":20}""").statusCode())
         assertEquals(403, post("/api/encounters/$id/undo", lyra, "").statusCode())
     }
 

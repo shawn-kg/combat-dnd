@@ -1,11 +1,13 @@
 package app.combatdnd.encounter.app
 
+import app.combatdnd.encounter.api.EncounterViewDto
 import app.combatdnd.encounter.api.toDto
 import app.combatdnd.encounter.domain.Actor
 import app.combatdnd.encounter.domain.EncounterState
-import app.combatdnd.encounter.domain.EncounterView
 import app.combatdnd.encounter.domain.viewFor
 import org.slf4j.LoggerFactory
+import org.springframework.context.event.ContextClosedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
@@ -24,7 +26,7 @@ class EncounterHub {
     private val log = LoggerFactory.getLogger(javaClass)
     private val subscribers = ConcurrentHashMap<UUID, CopyOnWriteArrayList<Subscriber>>()
 
-    fun subscribe(id: UUID, actor: Actor, initial: EncounterView): SseEmitter {
+    fun subscribe(id: UUID, actor: Actor, initial: EncounterViewDto): SseEmitter {
         val emitter = SseEmitter(0L) // no server-side timeout; the heartbeat keeps proxies from closing it
         val sub = Subscriber(actor, emitter)
         val list = subscribers.computeIfAbsent(id) { CopyOnWriteArrayList() }
@@ -37,19 +39,29 @@ class EncounterHub {
         return emitter
     }
 
-    fun broadcast(id: UUID, state: EncounterState) {
-        subscribers[id]?.forEach { send(it, viewFor(state, it.actor)) }
+    fun broadcast(id: UUID, state: EncounterState, name: String) {
+        subscribers[id]?.forEach { send(it, viewFor(state, it.actor).toDto(name)) }
     }
 
     fun connectionCount(id: UUID): Int = subscribers[id]?.size ?: 0
 
-    private fun send(sub: Subscriber, view: EncounterView) {
+    private fun send(sub: Subscriber, view: EncounterViewDto) {
         try {
-            sub.emitter.send(SseEmitter.event().name("state").data(view.toDto()))
+            sub.emitter.send(SseEmitter.event().name("state").data(view))
         } catch (e: Exception) {
             log.debug("Dropping a closed stream: {}", e.message)
             sub.emitter.completeWithError(e)
         }
+    }
+
+    /**
+     * Live streams never finish on their own, so a graceful shutdown would wait out its whole timeout for them.
+     * Closing them first lets a restart or deploy finish at once; browsers reconnect to the new server.
+     */
+    @EventListener(ContextClosedEvent::class)
+    fun closeAll() {
+        subscribers.values.forEach { list -> list.forEach { runCatching { it.emitter.complete() } } }
+        subscribers.clear()
     }
 
     @Scheduled(fixedRate = 15_000)
