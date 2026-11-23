@@ -71,7 +71,7 @@ Everything the DM sets up is saved, so starting a fight takes seconds.
 
 1. The current turn's row is highlighted for everyone. **Next turn** and **Previous turn** move it; the round counts up on wrap-around.
 2. During the fight the DM can add enemies, reveal hidden ones, remove or mark defeated, and edit any field inline.
-3. **End combat** writes the party's HP back to their characters and returns to prep.
+3. **End combat** writes the party's HP back to their characters and closes the fight for everyone. Players get a Join the fight banner on the campaign page once a fight starts.
 
 ### Logging a turn
 
