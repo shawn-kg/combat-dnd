@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { CampaignView, CharacterDto } from '../api/campaign'
+import type { CampaignView, CharacterDto, TemplateDto } from '../api/campaign'
 import { api, ApiError } from '../api/client'
 import { applyHpEdit } from '../combat/hpEdit'
 import { Portrait } from '../combat/Portrait'
+import { PortraitPicker } from '../combat/PortraitPicker'
 import './pages.css'
 
 /** A campaign's home: the DM manages players and characters; a player waits, chooses a character, sets their HP. */
@@ -51,6 +52,7 @@ function DmView({ c }: { c: CampaignView }) {
       <JoinLink c={c} />
       <Players c={c} />
       <Characters c={c} />
+      <Monsters c={c} />
       <p className="muted small">Encounters (prep, initiative and the tracker) come in the next milestone.</p>
     </>
   )
@@ -223,7 +225,9 @@ function Characters({ c }: { c: CampaignView }) {
   return (
     <section className="card">
       <h3>Characters</h3>
-      <p className="muted small">Make one for each player. They pick theirs once they're in. HP carries over from fight to fight.</p>
+      <p className="muted small">
+        Make one for each player. They pick theirs once they're in. HP carries over from fight to fight. Click a portrait to add a picture.
+      </p>
       <div className="list">
         {c.characters.map((ch) =>
           editing === ch.id ? (
@@ -243,7 +247,11 @@ function Characters({ c }: { c: CampaignView }) {
             </form>
           ) : (
             <div key={ch.id} className="list-row">
-              <Portrait c={ch} size="mini" />
+              <PortraitPicker
+                campaignId={c.id}
+                c={ch}
+                onUploaded={(portraitKey) => save.mutate({ id: ch.id, body: { name: ch.name, ac: ch.ac, maxHp: ch.maxHp, hp: ch.hp, portraitKey } })}
+              />
               <b>{ch.name}</b>
               <span className="muted small num">
                 AC {ch.ac} · {ch.hp}/{ch.maxHp} HP
@@ -296,6 +304,124 @@ function Characters({ c }: { c: CampaignView }) {
         >
           {fields}
           <button className="btn primary">Add character</button>
+        </form>
+      )}
+      {(formError || error) && <div className="err">{formError ?? (error as ApiError).message}</div>}
+    </section>
+  )
+}
+
+/** DM only: reusable monsters (portrait, AC, HP). Add enemies in the tracker starts from these. */
+function Monsters({ c }: { c: CampaignView }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [draft, setDraft] = useState({ name: '', ac: '', maxHp: '' })
+  const [formError, setFormError] = useState<string | null>(null)
+  const save = useCampaignAction(c.id, ({ id, body }: { id?: string; body: Record<string, unknown> }) =>
+    id ? api('PUT', `/campaigns/${c.id}/monster-templates/${id}`, body) : api('POST', `/campaigns/${c.id}/monster-templates`, body),
+  )
+  const del = useCampaignAction(c.id, (id: string) => api('DELETE', `/campaigns/${c.id}/monster-templates/${id}`))
+  const error = save.error ?? del.error
+
+  function submit(t?: TemplateDto) {
+    const [ac, maxHp] = [Number(draft.ac), Number(draft.maxHp)]
+    if (!draft.name.trim()) return setFormError('Give the monster a name.')
+    if (draft.ac === '' || draft.maxHp === '' || !Number.isInteger(ac) || !Number.isInteger(maxHp) || maxHp <= 0)
+      return setFormError('Enter AC and HP.')
+    setFormError(null)
+    save.mutate(
+      { id: t?.id, body: { name: draft.name.trim(), ac, maxHp, portraitKey: t?.portraitKey } },
+      {
+        onSuccess: () => {
+          setEditing(null)
+          setDraft({ name: '', ac: '', maxHp: '' })
+        },
+      },
+    )
+  }
+
+  const fields = (
+    <>
+      <input className="field grow" aria-label="Monster name" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      <input className="field n" type="number" aria-label="Monster AC" placeholder="AC" value={draft.ac} onChange={(e) => setDraft({ ...draft, ac: e.target.value })} />
+      <input className="field n" type="number" aria-label="Monster HP" placeholder="HP" value={draft.maxHp} onChange={(e) => setDraft({ ...draft, maxHp: e.target.value })} />
+    </>
+  )
+
+  return (
+    <section className="card">
+      <h3>Monsters</h3>
+      <p className="muted small">Save the enemies you use often. In a fight, Add enemies fills in their picture, AC and HP.</p>
+      <div className="list">
+        {c.templates.map((t) =>
+          editing === t.id ? (
+            <form
+              key={t.id}
+              className="list-row monster"
+              onSubmit={(e) => {
+                e.preventDefault()
+                submit(t)
+              }}
+            >
+              {fields}
+              <button className="btn small primary">Save</button>
+              <button type="button" className="btn small" onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <div key={t.id} className="list-row monster">
+              <PortraitPicker
+                campaignId={c.id}
+                c={t}
+                onUploaded={(portraitKey) => save.mutate({ id: t.id, body: { name: t.name, ac: t.ac, maxHp: t.maxHp, portraitKey } })}
+              />
+              <b>{t.name}</b>
+              <span className="muted small num">
+                AC {t.ac} · {t.maxHp} HP
+              </span>
+              <span className="spacer" />
+              {deleting === t.id ? (
+                <>
+                  <span className="small">Delete {t.name}?</span>
+                  <button className="btn small danger" onClick={() => del.mutate(t.id, { onSuccess: () => setDeleting(null) })}>
+                    Delete
+                  </button>
+                  <button className="btn small" onClick={() => setDeleting(null)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="btn small"
+                    onClick={() => {
+                      setDraft({ name: t.name, ac: String(t.ac), maxHp: String(t.maxHp) })
+                      setFormError(null)
+                      setEditing(t.id)
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button className="btn small danger" onClick={() => setDeleting(t.id)}>
+                    Delete…
+                  </button>
+                </>
+              )}
+            </div>
+          ),
+        )}
+      </div>
+      {editing === null && (
+        <form
+          className="lrow add-row"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          {fields}
+          <button className="btn primary">Add monster</button>
         </form>
       )}
       {(formError || error) && <div className="err">{formError ?? (error as ApiError).message}</div>}

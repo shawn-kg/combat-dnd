@@ -3,6 +3,7 @@ package app.combatdnd.campaign
 import app.combatdnd.auth.NotSignedIn
 import app.combatdnd.auth.PlayerStatus
 import app.combatdnd.auth.Session
+import app.combatdnd.portrait.PortraitService
 import app.combatdnd.web.BadRequest
 import app.combatdnd.web.Conflict
 import app.combatdnd.web.Forbidden
@@ -15,7 +16,7 @@ import java.security.SecureRandom
 import java.util.UUID
 
 @Service
-class CampaignService(private val repo: CampaignRepository, private val session: Session) {
+class CampaignService(private val repo: CampaignRepository, private val session: Session, private val portraits: PortraitService) {
     companion object {
         /** No 0/O or 1/I/L, so a code read aloud or typed from a phone gets through. */
         private const val CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -59,7 +60,8 @@ class CampaignService(private val repo: CampaignRepository, private val session:
         val playerDto = { p: PlayerRow -> PlayerDto(p.id, p.name, p.status, claimed[p.id]) }
 
         if (session.isDm(req, campaignId)) {
-            return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null)
+            val templates = repo.templates(campaignId).map { TemplateDto(it.id, it.name, it.portraitKey, it.ac, it.maxHp) }
+            return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null, templates = templates)
         }
         val me = session.player(req, campaignId) ?: throw session.notInCampaign(req, campaignId)
         if (me.status == PlayerStatus.REMOVED) throw NotSignedIn("The DM removed you from this campaign. Ask for the link again.")
@@ -139,7 +141,12 @@ class CampaignService(private val repo: CampaignRepository, private val session:
 
     private fun characterOr404(campaignId: UUID, id: UUID) = repo.character(campaignId, id) ?: throw NotFound("No such character.")
 
-    private fun validate(body: CharacterRequest, hp: Int): String {
+    private fun checkPortrait(key: String?, campaignId: UUID) {
+        if (key != null && !portraits.belongsTo(key, campaignId)) throw BadRequest("That portrait wasn't uploaded to this campaign.")
+    }
+
+    private fun validate(body: CharacterRequest, hp: Int, campaignId: UUID): String {
+        checkPortrait(body.portraitKey, campaignId)
         val name = body.name.trim().ifEmpty { throw BadRequest("Give the character a name.") }.take(60)
         if (body.ac < 0) throw BadRequest("AC can't be negative.")
         if (body.maxHp <= 0) throw BadRequest("Max HP must be above 0.")
@@ -150,7 +157,7 @@ class CampaignService(private val repo: CampaignRepository, private val session:
     fun createCharacter(req: HttpServletRequest, campaignId: UUID, body: CharacterRequest): CharacterDto {
         requireDm(req, campaignId)
         val hp = body.hp ?: body.maxHp
-        val name = validate(body, hp)
+        val name = validate(body, hp, campaignId)
         val id = repo.createCharacter(campaignId, name, body.portraitKey, body.ac, body.maxHp, hp)
         return CharacterDto(id, name, body.portraitKey, body.ac, hp, body.maxHp, null, null)
     }
@@ -159,7 +166,7 @@ class CampaignService(private val repo: CampaignRepository, private val session:
         requireDm(req, campaignId)
         val existing = characterOr404(campaignId, id)
         val hp = body.hp ?: minOf(existing.hp, body.maxHp)
-        repo.updateCharacter(id, validate(body, hp), body.portraitKey, body.ac, body.maxHp, hp)
+        repo.updateCharacter(id, validate(body, hp, campaignId), body.portraitKey, body.ac, body.maxHp, hp)
     }
 
     fun deleteCharacter(req: HttpServletRequest, campaignId: UUID, id: UUID) {
@@ -172,6 +179,34 @@ class CampaignService(private val repo: CampaignRepository, private val session:
         requireDm(req, campaignId)
         characterOr404(campaignId, id)
         repo.unassign(id)
+    }
+
+    // ---------- monster templates (DM only) ----------
+
+    private fun validTemplate(body: TemplateRequest, campaignId: UUID): String {
+        checkPortrait(body.portraitKey, campaignId)
+        if (body.ac < 0) throw BadRequest("AC can't be negative.")
+        if (body.maxHp <= 0) throw BadRequest("HP must be above 0.")
+        return body.name.trim().ifEmpty { throw BadRequest("Give the monster a name.") }.take(60)
+    }
+
+    fun createTemplate(req: HttpServletRequest, campaignId: UUID, body: TemplateRequest): TemplateDto {
+        requireDm(req, campaignId)
+        val name = validTemplate(body, campaignId)
+        val id = repo.createTemplate(campaignId, name, body.portraitKey, body.ac, body.maxHp)
+        return TemplateDto(id, name, body.portraitKey, body.ac, body.maxHp)
+    }
+
+    fun updateTemplate(req: HttpServletRequest, campaignId: UUID, id: UUID, body: TemplateRequest) {
+        requireDm(req, campaignId)
+        repo.template(campaignId, id) ?: throw NotFound("No such monster.")
+        repo.updateTemplate(id, validTemplate(body, campaignId), body.portraitKey, body.ac, body.maxHp)
+    }
+
+    fun deleteTemplate(req: HttpServletRequest, campaignId: UUID, id: UUID) {
+        requireDm(req, campaignId)
+        repo.template(campaignId, id) ?: throw NotFound("No such monster.")
+        repo.deleteTemplate(id)
     }
 
     /** A player picks their character, once. Only the DM can change it afterwards (unassign). */

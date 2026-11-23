@@ -1,11 +1,23 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
+import type { CampaignView } from '../api/campaign'
+import { api } from '../api/client'
 import type { EncounterView } from '../api/types'
+import { Portrait } from './Portrait'
 import { numberedNames } from './hpEdit'
 import type { Act } from './Tracker'
 
-/** DM only: add enemies mid-fight. Templates arrive with prep (milestone 4); for now type the stats. */
+/** DM only: add enemies mid-fight, from one of the campaign's monsters or by typing the stats. */
 export function AddEnemy({ view, act, onClose }: { view: EncounterView; act: Act; onClose: () => void }) {
   const [f, setF] = useState({ name: '', initiative: '', ac: '', hp: '', count: '1', hidden: false })
+  const [portraitKey, setPortraitKey] = useState<string | null>(null)
+  // The campaign's monsters. Quietly empty if they can't be loaded (e.g. the dev encounter opened with ?as=).
+  const templates = useQuery({
+    queryKey: ['campaign', view.campaignId],
+    queryFn: () => api<CampaignView>('GET', `/campaigns/${view.campaignId}`),
+    retry: false,
+    select: (c) => c.templates,
+  })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) =>
@@ -32,6 +44,7 @@ export function AddEnemy({ view, act, onClose }: { view: EncounterView; act: Act
         hp,
         maxHp: hp,
         hidden: f.hidden,
+        portraitKey,
       })),
     })
     setBusy(false)
@@ -41,10 +54,37 @@ export function AddEnemy({ view, act, onClose }: { view: EncounterView; act: Act
   return (
     <div className="card">
       <h3>Add enemies</h3>
+      {templates.data && templates.data.length > 0 && (
+        <div className="lrow">
+          <span className="lbl">From</span>
+          {templates.data.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="chip with-pic"
+              aria-pressed={f.name === t.name && portraitKey === t.portraitKey}
+              onClick={() => {
+                setF({ ...f, name: t.name, ac: String(t.ac), hp: String(t.maxHp) })
+                setPortraitKey(t.portraitKey)
+              }}
+            >
+              <Portrait c={t} size="mini" /> {t.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="add-grid">
         <label>
           Name
-          <input value={f.name} onChange={set('name')} placeholder="Goblin" autoFocus />
+          <input
+            value={f.name}
+            onChange={(e) => {
+              set('name')(e)
+              setPortraitKey(null)
+            }}
+            placeholder="Goblin"
+            autoFocus
+          />
         </label>
         <label>
           Initiative

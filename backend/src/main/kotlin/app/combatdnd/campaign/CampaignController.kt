@@ -82,6 +82,21 @@ class CampaignController(private val service: CampaignService, private val limit
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unassign(@PathVariable id: UUID, @PathVariable characterId: UUID, req: HttpServletRequest) = service.unassign(req, id, characterId)
 
+    // ---------- monster templates ----------
+
+    @PostMapping("/campaigns/{id}/monster-templates")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun createTemplate(@PathVariable id: UUID, @RequestBody body: TemplateRequest, req: HttpServletRequest) = service.createTemplate(req, id, body)
+
+    @PutMapping("/campaigns/{id}/monster-templates/{templateId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun updateTemplate(@PathVariable id: UUID, @PathVariable templateId: UUID, @RequestBody body: TemplateRequest, req: HttpServletRequest) =
+        service.updateTemplate(req, id, templateId, body)
+
+    @DeleteMapping("/campaigns/{id}/monster-templates/{templateId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteTemplate(@PathVariable id: UUID, @PathVariable templateId: UUID, req: HttpServletRequest) = service.deleteTemplate(req, id, templateId)
+
     @PostMapping("/campaigns/{id}/characters/{characterId}/claim")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun claim(@PathVariable id: UUID, @PathVariable characterId: UUID, req: HttpServletRequest) = service.claim(req, id, characterId)

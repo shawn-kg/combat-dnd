@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 // ---------- what the client receives (mirrors frontend/src/api/types.ts) ----------
 
 data class EncounterViewDto(
+    val campaignId: String,
     val name: String,
     val viewerIsDm: Boolean,
     val round: Int,
@@ -54,8 +55,8 @@ data class AttackViewDto(
     val damage: Int,
 )
 
-fun EncounterView.toDto(name: String) =
-    EncounterViewDto(name, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
+fun EncounterView.toDto(name: String, campaignId: java.util.UUID) =
+    EncounterViewDto(campaignId.toString(), name, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
     id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),

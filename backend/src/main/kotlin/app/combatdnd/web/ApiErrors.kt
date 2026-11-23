@@ -35,5 +35,9 @@ class ApiErrors {
     fun api(e: ApiException) = error(e.status, e.message)
 
     @ExceptionHandler
+    fun tooBig(e: org.springframework.web.multipart.MaxUploadSizeExceededException) =
+        error(HttpStatus.PAYLOAD_TOO_LARGE, "That picture is over 5 MB. Try a smaller one.")
+
+    @ExceptionHandler
     fun unreadable(e: HttpMessageNotReadableException) = error(HttpStatus.BAD_REQUEST, "That request isn't valid JSON for this command.")
 }

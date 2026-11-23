@@ -98,6 +98,7 @@ cd frontend && npm run lint && npm test && npm run build
    logs for anyone, reveals, defeats, removes, adds enemies (as one undoable action), fixes entries in the
    turn log, and has Previous, Next and Undo (N and U keys).
 5. Campaigns and people: ~~start a campaign, join link, DM approval, choosing a character once, the DM's
-   characters, players setting their own HP, sign-in cookies~~ (3a); monster templates and portrait uploads (3b).
+   characters, players setting their own HP, sign-in cookies~~ (3a); ~~monster templates and portrait uploads~~ (3b).
+   Portraits are saved under `backend/data/portraits` in development.
 6. Encounter prep.
 7. Deploy to Fly.io and run a test session.

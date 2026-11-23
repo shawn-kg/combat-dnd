@@ -146,7 +146,7 @@ Starting and ending a fight: `StartCombat` (builds combatants from the roster, s
 | `POST /api/campaigns/{id}/players/{pid}/approve`, `/deny`, `/remove` | DM manages players |
 | `POST /api/campaigns/{id}/characters/{cid}/claim` | A player chooses their character (once) |
 | `GET, POST, PUT, DELETE /api/campaigns/{id}/characters` and `/monster-templates` | DM CRUD |
-| `POST /api/campaigns/{id}/images` | DM uploads a portrait; returns its key |
+| `POST /api/campaigns/{id}/portraits` | DM uploads a portrait; returns its key |
 | `POST /api/campaigns/{id}/encounters` | Prep |
 | `POST /api/encounters/{id}/commands` | Every tracker command, with `expectedVersion` |
 | `GET /api/encounters/{id}/stream` | SSE: this viewer's filtered tracker after every change |
@@ -160,7 +160,7 @@ Starting and ending a fight: `StartCombat` (builds combatants from the roster, s
 5. In one transaction, insert the events, bump the version and write party HP.
 6. Fold the events into the cached state, unlock, then send each viewer their filtered snapshot.
 
-Image uploads are limited to 5 MB, JPEG, PNG or WebP, and resized to 256 × 256 on the server before storing. Portraits are served through short-lived signed URLs.
+Image uploads are limited to 5 MB, JPEG or PNG, and resized to 256 × 256 on the server before storing. Portraits are served at `/api/portraits/<key>`. Keys are random and never reused, so knowing one is the permission and browsers cache them for a year. A character or monster can only use a portrait uploaded to its own campaign.
 
 ## Frontend
 

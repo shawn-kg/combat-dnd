@@ -39,6 +39,7 @@ export interface CombatantView {
 }
 
 export interface EncounterView {
+  campaignId: string
   name: string
   /** Decides which controls to show; the server still checks every command. */
   viewerIsDm: boolean
