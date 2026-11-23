@@ -42,11 +42,32 @@ the last 6 hours (Neon dashboard → **Restore**), which is the quickest fix for
 
 ### Restoring a backup
 
-Download the artifact from the Backup run you want, unzip it, then:
+For a mistake in the last 6 hours, Neon's own restore is quickest: Neon dashboard → **Restore**, pick a time
+just before the mistake. Otherwise, restore a nightly backup:
 
-```bash
-docker run --rm -v "$PWD":/d postgres:18 pg_restore --clean --if-exists --no-owner -d "<Neon connection string>" /d/combat-dnd.dump
-```
+1. **Get the backup.** GitHub → **Actions → Backup**, open the run from the night you want, and download the
+   `combat-dnd-…` artifact at the bottom. Unzip it to get `combat-dnd.dump`. On Windows it lands in Downloads,
+   which WSL sees as `/mnt/c/Users/<you>/Downloads`.
+2. **Pause the app.** Render → the service → **Settings → Suspend Web Service**, so nobody changes anything
+   halfway through.
+3. **Restore.** In a terminal, in the folder with `combat-dnd.dump`. The first command asks for the Neon
+   connection string (the direct one) without echoing it or saving it in your shell history:
+
+   ```bash
+   read -rs DATABASE_URL && export DATABASE_URL
+   ```
+
+   ```bash
+   docker run --rm -e DATABASE_URL -v "$PWD":/d postgres:18 sh -c 'pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction -d "$DATABASE_URL" /d/combat-dnd.dump'
+   ```
+
+   This replaces everything in the database with the backup: campaigns, characters, fights and portraits as
+   they were that night. `--single-transaction` means it either all works or nothing changes.
+4. **Start the app again.** Render → **Resume Web Service**. It reads the restored data fresh on startup
+   (fights are cached in memory, which is why it must restart).
+
+Want to look before replacing anything? In Neon, create a **branch** (a copy of the database), restore into
+the branch's connection string instead, and check it in Neon's SQL Editor first.
 
 ## 4. Start playing
 
