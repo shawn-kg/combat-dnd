@@ -1,5 +1,8 @@
 package app.combatdnd.encounter.domain
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
+
 @JvmInline
 value class CombatantId(val value: String)
 
@@ -17,7 +20,12 @@ sealed interface Actor {
     data class Player(val id: PlayerId) : Actor
 }
 
-/** Who controls a combatant: the player who claimed the character, or the DM. */
+/**
+ * Who controls a combatant: the player who claimed the character, or the DM.
+ * Stored in events as {"kind":"dm"} or {"kind":"player","id":"..."}; the annotations are metadata only.
+ */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "kind")
+@JsonSubTypes(JsonSubTypes.Type(Controller.Dm::class, name = "dm"), JsonSubTypes.Type(Controller.Player::class, name = "player"))
 sealed interface Controller {
     data object Dm : Controller
     data class Player(val id: PlayerId) : Controller
