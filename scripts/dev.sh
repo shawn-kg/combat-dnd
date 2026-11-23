@@ -32,7 +32,7 @@ node_major() { command -v node >/dev/null && node -p 'process.versions.node.spli
 # If nvm is installed, load it and switch to Node 22 for this run.
 if [[ "$(node_major)" -lt 22 && -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
   set +u; . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
-  if nvm use 22 >/dev/null 2>&1; then say "Using Node $(node -v) from nvm"; fi
+  if nvm use "$(cat .nvmrc)" >/dev/null 2>&1; then say "Using Node $(node -v) from nvm"; fi
   set -u
 fi
 command -v node >/dev/null || fail "Node isn't installed. Install nvm, then: nvm install 22 (see README)"
