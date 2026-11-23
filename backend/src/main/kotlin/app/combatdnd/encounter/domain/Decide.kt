@@ -16,7 +16,7 @@ private const val DM_ONLY = "Only the DM can do that."
 /**
  * May this actor do this now, and what happens if so?
  *
- * The DM may do anything. A player may log attacks for their own character during its turn,
+ * The DM may do anything, except log an attack for someone at 0 HP (nobody can). A player may log attacks for their own character during its turn,
  * fix their own entries from that turn, end their own turn, set their own character's HP at any time,
  * and roll their own initiative before round 1 begins.
  */
@@ -30,6 +30,8 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
                 !actor.controls(attacker) -> forbidden("That isn't your character.")
                 !isDm && state.currentId != attacker.id -> forbidden("You can log attacks on your own turn.")
                 !isDm && target.hidden -> invalid("Unknown target.")
+                // At 0 HP you're down: your turn still comes (death saves), but you can't attack. Heal first.
+                attacker.hp == 0 -> invalid("${attacker.name} is at 0 HP and can't attack. Heal them above 0 first.")
                 target.id == attacker.id -> invalid("Pick someone other than yourself.")
                 cmd.damage < 0 -> invalid("Damage can't be negative.")
                 else -> ok(

@@ -71,7 +71,7 @@ export function Tracker({
 
   // A player's log panel closes when their turn ends.
   const logAttacker = view.combatants.find((c) => c.id === logFor)
-  const logOpen = logAttacker && (dm || logAttacker.isCurrent)
+  const logOpen = logAttacker && (dm || logAttacker.isCurrent) && logAttacker.hp !== 0 // closes if they drop to 0 HP
 
   // DM shortcuts: N next turn, U undo (not while typing).
   useEffect(() => {
@@ -236,6 +236,9 @@ function TrackerRow({
   // On a turn, the person running that combatant gets the buttons right on the row: the player on their
   // own turn, and the DM on every turn (so enemy turns don't need the ⋯ menu).
   const runsThisTurn = c.isCurrent && (dm || c.controlledByViewer)
+  // At 0 HP they still take their turn (death saves) but can't attack until healed. Null HP means the viewer
+  // can't see it (an enemy, for a player), and players never run enemies, so that never hides their own button.
+  const down = c.hp === 0
 
   return (
     <li className={classes.filter(Boolean).join(' ')} aria-current={c.isCurrent ? 'step' : undefined}>
@@ -255,9 +258,13 @@ function TrackerRow({
             {c.defeated && <span className="tag">Defeated</span>}
             {runsThisTurn && !children && (
               <>
-                <button type="button" className="btn small primary" onClick={onLog}>
-                  Log attack
-                </button>
+                {down ? (
+                  <span className="down-note">0 HP: can’t attack until healed</span>
+                ) : (
+                  <button type="button" className="btn small primary" onClick={onLog}>
+                    Log attack
+                  </button>
+                )}
                 <button type="button" className="btn small" onClick={() => act({ type: 'NextTurn' })}>
                   End turn ▶
                 </button>
@@ -296,9 +303,11 @@ function TrackerRow({
       </div>
       {dm && menuOpen && (
         <div className="strip">
-          <button type="button" className="btn small" onClick={onLog}>
-            Log attack
-          </button>
+          {!down && (
+            <button type="button" className="btn small" onClick={onLog}>
+              Log attack
+            </button>
+          )}
           {c.hidden && (
             <button type="button" className="btn small" onClick={() => act({ type: 'RevealCombatant', id: c.id })}>
               Reveal to players

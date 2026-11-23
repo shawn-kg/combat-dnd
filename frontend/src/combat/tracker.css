@@ -596,3 +596,8 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+.down-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hp-low);
+}
