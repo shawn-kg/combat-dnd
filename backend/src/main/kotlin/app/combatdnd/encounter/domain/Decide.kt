@@ -17,7 +17,7 @@ private const val DM_ONLY = "Only the DM can do that."
  * May this actor do this now, and what happens if so?
  *
  * The DM may do anything. A player may log attacks for their own character during its turn,
- * fix their own entries from that turn, and end their own turn.
+ * fix their own entries from that turn, end their own turn, and set their own character's HP at any time.
  */
 fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
     val isDm = actor == Actor.Dm
@@ -114,9 +114,12 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
         is Command.EditCombatant -> {
             val c = state.combatants[cmd.id]
             val maxHp = cmd.maxHp ?: c?.maxHp ?: 0
+            // Players may set their own character's HP, and nothing else.
+            val onlyHp = cmd.hp != null && listOf(cmd.name, cmd.portraitKey, cmd.initiative, cmd.ac, cmd.maxHp).all { it == null }
             when {
-                !isDm -> forbidden(DM_ONLY)
                 c == null -> invalid("Unknown combatant.")
+                !isDm && !actor.controls(c) -> forbidden(DM_ONLY)
+                !isDm && !onlyHp -> forbidden("You can change your own HP. Ask the DM for anything else.")
                 cmd.name != null && cmd.name.isBlank() -> invalid("Give it a name.")
                 maxHp <= 0 -> invalid("Max HP must be above 0.")
                 cmd.hp != null && cmd.hp !in 0..maxHp -> invalid("HP must be between 0 and $maxHp.")

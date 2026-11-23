@@ -118,7 +118,8 @@ class EncounterApiTest(
         assertEquals(403, notYourTurn.statusCode())
         assertEquals("You can log attacks on your own turn.", json.readTree(notYourTurn.body()).get("message").asString())
 
-        assertEquals(403, command(id, lyra, """{"type":"EditCombatant","id":"lyra","hp":27}""").statusCode())
+        assertEquals(403, command(id, lyra, """{"type":"EditCombatant","id":"lyra","ac":20}""").statusCode())
+        assertEquals(200, command(id, lyra, """{"type":"EditCombatant","id":"lyra","hp":20}""").statusCode())
         assertEquals(403, post("/api/encounters/$id/undo", lyra, "").statusCode())
     }
 

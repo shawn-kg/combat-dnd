@@ -163,7 +163,9 @@ function TrackerRow({
     const n = Number(text)
     if (Number.isInteger(n)) edit({ [field]: n })
   }
-  const myTurn = !dm && c.controlledByViewer && c.isCurrent
+  // On a turn, the person running that combatant gets the buttons right on the row: the player on their
+  // own turn, and the DM on every turn (so enemy turns don't need the ⋯ menu).
+  const runsThisTurn = c.isCurrent && (dm || c.controlledByViewer)
 
   return (
     <li className={classes.filter(Boolean).join(' ')} aria-current={c.isCurrent ? 'step' : undefined}>
@@ -181,7 +183,7 @@ function TrackerRow({
             {c.isCurrent && <span className="tag turn">{c.controlledByViewer ? 'Your turn' : 'Turn'}</span>}
             {c.hidden && <span className="tag">Hidden</span>}
             {c.defeated && <span className="tag">Defeated</span>}
-            {myTurn && !children && (
+            {runsThisTurn && !children && (
               <>
                 <button type="button" className="btn small primary" onClick={onLog}>
                   Log attack
@@ -200,7 +202,7 @@ function TrackerRow({
             <Editable enabled={dm} display={c.ac} initial="" label={`AC for ${c.name}`} onCommit={editInt('ac')} />
           )}
         </span>
-        <Hp c={c} dm={dm} edit={edit} />
+        <Hp c={c} dm={dm} canEditHp={dm || c.controlledByViewer} edit={edit} />
         <span className="last">
           {c.lastTurn ? (
             <>
@@ -245,7 +247,18 @@ function TrackerRow({
   )
 }
 
-function Hp({ c, dm, edit }: { c: CombatantView; dm: boolean; edit: (patch: Record<string, unknown>) => void }) {
+function Hp({
+  c,
+  dm,
+  canEditHp,
+  edit,
+}: {
+  c: CombatantView
+  dm: boolean
+  /** The DM, or a player on their own row: players may set their own HP, but not max HP. */
+  canEditHp: boolean
+  edit: (patch: Record<string, unknown>) => void
+}) {
   if (c.hp === null || c.maxHp === null) return <span className="hp num muted">—</span>
   const { hp, maxHp } = c
   const pct = Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100)))
@@ -254,7 +267,7 @@ function Hp({ c, dm, edit }: { c: CombatantView; dm: boolean; edit: (patch: Reco
     <span className="hp">
       <span className="hpnum num">
         <Editable
-          enabled={dm}
+          enabled={canEditHp}
           display={hp}
           initial=""
           label={`HP for ${c.name}`}

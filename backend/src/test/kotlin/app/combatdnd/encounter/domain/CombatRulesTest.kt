@@ -188,11 +188,22 @@ class DmEditingTest {
     fun `players cannot edit, add, reveal or reorder`() {
         val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, 12, 13, 7, 7)
         listOf(
-            Command.EditCombatant(LYRA, hp = 27),
+            Command.EditCombatant(LYRA, ac = 20),
+            Command.EditCombatant(LYRA, hp = 27, maxHp = 40),
+            Command.EditCombatant(BRAM, hp = 1),
             Command.AddCombatant(gob),
             Command.RevealCombatant(ARCHER),
             Command.Reorder(ambush().order.reversed()),
         ).forEach { assertIs<Decision.Rejected>(decide(ambush(), it, lyraActor)) }
+    }
+
+    @Test
+    fun `players can set their own HP at any time, but nobody else's`() {
+        val notMyTurn = ambush(current = BOSS)
+        val s = notMyTurn.run(lyraActor to Command.EditCombatant(LYRA, hp = 25))
+        assertEquals(25, s.combatant(LYRA).hp)
+        assertIs<Decision.Rejected>(decide(notMyTurn, Command.EditCombatant(LYRA, hp = 99), lyraActor)) // above max
+        assertIs<Decision.Rejected>(decide(notMyTurn, Command.EditCombatant(BOSS, hp = 1), lyraActor))
     }
 
     @Test
