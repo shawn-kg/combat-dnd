@@ -44,6 +44,14 @@ export interface CampaignView {
   templates: TemplateDto[]
   /** The DM sees every encounter, newest first; players only see fights under way. */
   encounters: EncounterSummary[]
+  /** DM only: whether a DM sign-in link exists (it's only shown when made), and how many devices are signed in as DM. */
+  dmLinkMade: boolean
+  dmDevices: number
+}
+
+export interface DmLinkInfo {
+  campaignId: string
+  campaignName: string
 }
 
 export interface EncounterSummary {

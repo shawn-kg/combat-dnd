@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import { CampaignPage } from './pages/CampaignPage'
 import { CombatPage } from './pages/CombatPage'
+import { DmSignInPage } from './pages/DmSignInPage'
 import { HomePage } from './pages/HomePage'
 import { JoinPage } from './pages/JoinPage'
 import { PrepPage } from './pages/PrepPage'
@@ -16,6 +17,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/join/:code" element={<JoinPage />} />
+        <Route path="/dm/:code" element={<DmSignInPage />} />
         <Route path="/c/:campaignId" element={<CampaignPage />} />
         <Route path="/c/:campaignId/encounters/:encounterId" element={<PrepPage />} />
         <Route path="/combat/:encounterId" element={<CombatPage />} />

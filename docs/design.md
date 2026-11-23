@@ -49,6 +49,8 @@ Removed from the earlier design: the DM-confirmed attack flow, reactions, send b
 
 The DM can unassign a character (if someone picked the wrong one), remove a player, or regenerate the join code.
 
+**The DM on other devices:** the DM makes a **DM sign-in link** on the campaign page (shown once; only its hash is stored) and saves it somewhere private. Opening it on any browser signs that browser in as the DM, alongside the others, which also covers a DM who cleared their cookies. Making a new link stops the old one working; **Sign out other devices** signs out every DM browser but the current one.
+
 ### Portraits
 
 The DM uploads a picture for each character and monster template. It's cropped to a square and shown as a circle. Without a picture, the row shows the name's initials on a party or enemy colored background.
@@ -91,7 +93,8 @@ Postgres holds everything except image files, which go to object storage. A figh
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `campaign` | name, join_code, dm_token_hash | One per group |
+| `campaign` | name, join_code, dm_link_hash | One per group; `dm_link_hash` is the DM sign-in link's hash |
+| `dm_device` | campaign_id, token_hash | One per browser signed in as the DM |
 | `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords |
 | `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
 | `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |

@@ -28,9 +28,36 @@ class CampaignRepository(private val jdbc: JdbcClient) {
 
     // ---------- campaigns ----------
 
-    fun create(name: String, joinCode: String, dmTokenHash: String): UUID =
-        jdbc.sql("insert into campaign (name, join_code, dm_token_hash) values (?, ?, ?) returning id")
-            .params(name, joinCode, dmTokenHash).query(UUID::class.java).single()
+    /** A new campaign, with the creating browser as its first DM device. */
+    fun create(name: String, joinCode: String, dmTokenHash: String): UUID {
+        val id = jdbc.sql("insert into campaign (name, join_code) values (?, ?) returning id")
+            .params(name, joinCode).query(UUID::class.java).single()
+        addDmDevice(id, dmTokenHash)
+        return id
+    }
+
+    // ---------- DM devices and the DM sign-in link ----------
+
+    fun addDmDevice(campaignId: UUID, tokenHash: String) {
+        jdbc.sql("insert into dm_device (campaign_id, token_hash) values (?, ?)").params(campaignId, tokenHash).update()
+    }
+
+    fun dmDeviceCount(campaignId: UUID): Int =
+        jdbc.sql("select count(*) from dm_device where campaign_id = ?").param(campaignId).query(Int::class.java).single()
+
+    /** Signs out every DM device except the one with this hash. Returns how many were signed out. */
+    fun removeOtherDmDevices(campaignId: UUID, keepHash: String): Int =
+        jdbc.sql("delete from dm_device where campaign_id = ? and token_hash <> ?").params(campaignId, keepHash).update()
+
+    fun setDmLink(campaignId: UUID, linkHash: String) {
+        jdbc.sql("update campaign set dm_link_hash = ? where id = ?").params(linkHash, campaignId).update()
+    }
+
+    fun hasDmLink(campaignId: UUID): Boolean =
+        jdbc.sql("select dm_link_hash is not null from campaign where id = ?").param(campaignId).query(Boolean::class.java).single()
+
+    fun campaignByDmLink(linkHash: String): CampaignRow? =
+        jdbc.sql("select id, name, join_code from campaign where dm_link_hash = ?").param(linkHash).query(::campaignRow).optional().orElse(null)
 
     fun campaign(id: UUID): CampaignRow? =
         jdbc.sql("select id, name, join_code from campaign where id = ?").param(id).query(::campaignRow).optional().orElse(null)

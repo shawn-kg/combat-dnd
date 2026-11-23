@@ -68,7 +68,7 @@ class CampaignService(
         if (session.isDm(req, campaignId)) {
             val templates = repo.templates(campaignId).map { TemplateDto(it.id, it.name, it.portraitKey, it.ac, it.maxHp) }
             return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null, templates = templates,
-                encounters = encounters.campaignEncounters(campaignId))
+                encounters = encounters.campaignEncounters(campaignId), dmLinkMade = repo.hasDmLink(campaignId), dmDevices = repo.dmDeviceCount(campaignId))
         }
         val me = session.player(req, campaignId) ?: throw session.notInCampaign(req, campaignId)
         if (me.status == PlayerStatus.REMOVED) throw NotSignedIn("The DM removed you from this campaign. Ask for the link again.")
@@ -97,6 +97,40 @@ class CampaignService(
             if (!repo.codeTaken(code)) return code
         }
         throw IllegalStateException("Couldn't find a free join code.")
+    }
+
+    // ---------- the DM on other devices ----------
+
+    /** Makes a new DM sign-in link, replacing any old one (which stops working). Devices already signed in stay in. */
+    fun makeDmLink(req: HttpServletRequest, campaignId: UUID): DmLink {
+        requireDm(req, campaignId)
+        val code = Session.newToken()
+        repo.setDmLink(campaignId, Session.hash(code))
+        return DmLink(code)
+    }
+
+    private fun campaignByDmLink(code: String) =
+        repo.campaignByDmLink(Session.hash(code)) ?: throw NotFound("That DM sign-in link doesn't work. It may have been replaced by a newer one.")
+
+    fun dmLinkInfo(code: String): DmLinkInfo = campaignByDmLink(code).let { DmLinkInfo(it.id, it.name) }
+
+    /** Opening the DM sign-in link: this browser becomes a DM device of the campaign. */
+    @Transactional
+    fun useDmLink(req: HttpServletRequest, res: HttpServletResponse, code: String): DmLinkInfo {
+        val c = campaignByDmLink(code)
+        if (!session.isDm(req, c.id)) {
+            val token = Session.newToken()
+            repo.addDmDevice(c.id, Session.hash(token))
+            session.signInAsDm(req, res, c.id, token)
+        }
+        return DmLinkInfo(c.id, c.name)
+    }
+
+    /** Signs out every other device that's signed in as this campaign's DM. */
+    fun signOutOtherDmDevices(req: HttpServletRequest, campaignId: UUID): SignedOutDevices {
+        requireDm(req, campaignId)
+        val mine = session.dmToken(req, campaignId)!!
+        return SignedOutDevices(repo.removeOtherDmDevices(campaignId, Session.hash(mine)))
     }
 
     // ---------- joining ----------

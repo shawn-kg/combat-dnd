@@ -9,6 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping
  */
 @Controller
 class SpaForwardController {
-    @GetMapping("/join/**", "/c/**", "/combat/**")
+    @GetMapping("/join/**", "/dm/**", "/c/**", "/combat/**")
     fun forward(): String = "forward:/index.html"
 }
