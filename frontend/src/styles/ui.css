@@ -1,0 +1,142 @@
+/* Shared controls: buttons, chips, fields, cards. Used by every page. */
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  border-radius: 9px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--gold);
+}
+.btn.primary {
+  background: var(--gold);
+  color: var(--on-gold);
+  border-color: var(--gold);
+  font-weight: 600;
+}
+.btn.small {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+.btn.danger:hover {
+  border-color: var(--hp-low);
+  color: var(--hp-low);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+kbd {
+  font-family: var(--font-body);
+  font-size: 10px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 6px;
+  color: var(--muted);
+}
+.chip {
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chip.hitc[aria-pressed='true'] {
+  border-color: var(--hp-high);
+  color: var(--hp-high);
+}
+.chip.missc[aria-pressed='true'] {
+  border-color: var(--muted);
+}
+.field {
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  font-size: 13px;
+}
+.field.n {
+  width: 90px;
+}
+.editable {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 5px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  max-width: 100%;
+}
+.editable:hover {
+  background: var(--bg);
+  outline: 1px dashed var(--gold);
+}
+.edit-in {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: var(--bg);
+  font-size: 13px;
+}
+.err {
+  color: var(--hp-low);
+  font-size: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.lrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 64px;
+}
+.spacer {
+  flex: 1;
+}
+.notice {
+  border: 1px solid var(--hp-low);
+  background: color-mix(in srgb, var(--hp-low) 12%, var(--surface));
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.notice.ok {
+  border-color: var(--hp-high);
+  background: color-mix(in srgb, var(--hp-high) 10%, var(--surface));
+}

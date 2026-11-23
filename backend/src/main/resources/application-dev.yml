@@ -1,0 +1,4 @@
+# Local development (./gradlew bootRun and scripts/dev.sh use this profile).
+combat:
+  # Lets ?as=dm or ?as=player:<id> stand in for sign-in, so the seeded encounter works without joining.
+  dev-sign-in: true

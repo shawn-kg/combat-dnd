@@ -20,20 +20,20 @@ class EncounterController(private val service: EncounterService, private val act
     /** This viewer's filtered tracker. */
     @GetMapping("/state")
     fun state(@PathVariable id: UUID, request: HttpServletRequest): EncounterViewDto =
-        service.view(id, actors.resolve(request))
+        service.view(id, actors.resolve(request, id))
 
     /** Every tracker command. Send the version you last saw as `expectedVersion`; a stale one gets 409. */
     @PostMapping("/commands")
     fun command(@PathVariable id: UUID, @RequestBody body: CommandRequest, request: HttpServletRequest): VersionResponse =
-        VersionResponse(service.handle(id, actors.resolve(request), body.toCommand(), body.expectedVersion))
+        VersionResponse(service.handle(id, actors.resolve(request, id), body.toCommand(), body.expectedVersion))
 
     /** DM only: reverses the last command. */
     @PostMapping("/undo")
     fun undo(@PathVariable id: UUID, request: HttpServletRequest): VersionResponse =
-        VersionResponse(service.undo(id, actors.resolve(request)))
+        VersionResponse(service.undo(id, actors.resolve(request, id)))
 
     /** Server-Sent Events: a "state" event with this viewer's tracker now and after every change. */
     @GetMapping("/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     fun stream(@PathVariable id: UUID, request: HttpServletRequest): SseEmitter =
-        service.subscribe(id, actors.resolve(request))
+        service.subscribe(id, actors.resolve(request, id))
 }

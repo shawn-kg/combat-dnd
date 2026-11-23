@@ -141,8 +141,8 @@ Starting and ending a fight: `StartCombat` (builds combatants from the roster, s
 | Method and path | Purpose |
 | --- | --- |
 | `POST /api/campaigns` | Create a campaign; sets the DM cookie |
-| `POST /api/campaigns/join` | Join or rejoin with the code |
-| `GET /api/campaigns/{id}/lobby/stream` | SSE so a waiting player sees approval at once |
+| `GET` and `POST /api/join/{code}` | The join page: campaign name and returning players, then join or rejoin (rate limited) |
+| `GET /api/campaigns/{id}`, `GET /api/me/campaigns` | The campaign page for the DM or a player, refreshed every 3 seconds so the lobby updates by itself; the browser's campaigns |
 | `POST /api/campaigns/{id}/players/{pid}/approve`, `/deny`, `/remove` | DM manages players |
 | `POST /api/campaigns/{id}/characters/{cid}/claim` | A player chooses their character (once) |
 | `GET, POST, PUT, DELETE /api/campaigns/{id}/characters` and `/monster-templates` | DM CRUD |

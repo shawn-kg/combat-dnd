@@ -1,28 +1,34 @@
 package app.combatdnd.auth
 
+import app.combatdnd.encounter.app.EncounterNotFound
 import app.combatdnd.encounter.domain.Actor
 import app.combatdnd.encounter.domain.PlayerId
 import jakarta.servlet.http.HttpServletRequest
-import org.springframework.context.annotation.Profile
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
 import java.util.UUID
 
-class NotSignedIn(message: String = "Join the campaign first.") : RuntimeException(message)
-
-/** Works out who is making a request: the DM or a player. */
-fun interface ActorResolver {
-    fun resolve(request: HttpServletRequest): Actor
-}
-
-/**
- * Development only: `?as=dm` or `?as=player:<uuid>` (or the X-Dev-Actor header).
- * A query parameter because EventSource can't send headers. Real cookies arrive in milestone 3.
- */
+/** Works out who is making a request about an encounter: the DM or an approved player of its campaign. */
 @Component
-@Profile("dev")
-class DevActorResolver : ActorResolver {
-    override fun resolve(request: HttpServletRequest): Actor {
-        val raw = request.getParameter("as") ?: request.getHeader("X-Dev-Actor") ?: throw NotSignedIn("Add ?as=dm or ?as=player:<id>.")
+class ActorResolver(
+    private val session: Session,
+    private val jdbc: JdbcClient,
+    @Value("\${combat.dev-sign-in:false}") private val devSignIn: Boolean,
+) {
+    fun resolve(request: HttpServletRequest, encounterId: UUID): Actor {
+        if (devSignIn) devActor(request)?.let { return it }
+        val campaignId = jdbc.sql("select campaign_id from encounter where id = ?").param(encounterId)
+            .query(UUID::class.java).optional().orElseThrow { EncounterNotFound(encounterId) }
+        return session.actorFor(request, campaignId)
+    }
+
+    /**
+     * Development only (combat.dev-sign-in, on in the dev profile): `?as=dm` or `?as=player:<uuid>`,
+     * or the X-Dev-Actor header, so the seeded encounter works without joining a campaign.
+     */
+    private fun devActor(request: HttpServletRequest): Actor? {
+        val raw = request.getParameter("as") ?: request.getHeader("X-Dev-Actor") ?: return null
         return when {
             raw == "dm" -> Actor.Dm
             raw.startsWith("player:") -> runCatching { UUID.fromString(raw.removePrefix("player:")) }
@@ -31,11 +37,4 @@ class DevActorResolver : ActorResolver {
             else -> throw NotSignedIn("Use ?as=dm or ?as=player:<id>.")
         }
     }
-}
-
-/** Outside development nobody is signed in until campaign joining exists (milestone 3). */
-@Component
-@Profile("!dev")
-class NoActorResolver : ActorResolver {
-    override fun resolve(request: HttpServletRequest): Actor = throw NotSignedIn()
 }
