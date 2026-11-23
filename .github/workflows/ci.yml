@@ -14,7 +14,7 @@ jobs:
     # The API tests run the real server against Postgres.
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18 # matches the Neon database
         env:
           POSTGRES_DB: combat_dnd
           POSTGRES_USER: combat

@@ -9,7 +9,7 @@ You need: this GitHub repository, and free accounts on [Neon](https://neon.com) 
 ## 1. Create the database (Neon)
 
 1. Sign in to Neon and create a project, e.g. `combat-dnd`.
-   - **Postgres version:** 17.
+   - **Postgres version:** whatever Neon suggests (17 or 18 both work).
    - **Region:** AWS US East 2 (Ohio). It should match the Render region in `render.yaml` (`ohio`), so the app and
      database are close together. If your group is elsewhere, pick a Neon region near you and change `region:` in
      `render.yaml` to the nearest Render region.
@@ -45,7 +45,7 @@ the last 6 hours (Neon dashboard → **Restore**), which is the quickest fix for
 Download the artifact from the Backup run you want, unzip it, then:
 
 ```bash
-docker run --rm -v "$PWD":/d postgres:17 pg_restore --clean --if-exists --no-owner -d "<Neon connection string>" /d/combat-dnd.dump
+docker run --rm -v "$PWD":/d postgres:18 pg_restore --clean --if-exists --no-owner -d "<Neon connection string>" /d/combat-dnd.dump
 ```
 
 ## 4. Start playing
