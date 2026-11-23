@@ -189,6 +189,46 @@ class CampaignApiTest(
     }
 
     @Test
+    fun `the DM signs in on another device with their DM sign-in link`() {
+        val t = Table()
+        val view = t.dm.read("/api/campaigns/${t.id}")
+        assertEquals(false, view.get("dmLinkMade").asBoolean())
+        assertEquals(1, view.get("dmDevices").asInt())
+
+        // Only the DM makes the link.
+        val stranger = Browser()
+        assertEquals(403, stranger.post("/api/campaigns/${t.id}/dm-link").statusCode())
+        val code = t.dm.post("/api/campaigns/${t.id}/dm-link").json().get("code").asString()
+        assertTrue(t.dm.read("/api/campaigns/${t.id}").get("dmLinkMade").asBoolean())
+
+        // A second laptop opens it and is the DM, alongside the first.
+        val laptop = Browser()
+        assertEquals("Tuesday Group", laptop.read("/api/dm-sign-in/$code").get("campaignName").asString())
+        assertEquals(t.id, laptop.post("/api/dm-sign-in/$code").json().get("campaignId").asString())
+        assertEquals("DM", laptop.read("/api/campaigns/${t.id}").get("role").asString())
+        assertEquals("DM", t.dm.read("/api/campaigns/${t.id}").get("role").asString())
+        assertEquals(2, t.dm.read("/api/campaigns/${t.id}").get("dmDevices").asInt())
+        assertTrue(laptop.read("/api/me/campaigns").any { it.get("id").asString() == t.id && it.get("role").asString() == "DM" })
+        // Opening it again on the same browser doesn't add another device.
+        laptop.post("/api/dm-sign-in/$code")
+        assertEquals(2, t.dm.read("/api/campaigns/${t.id}").get("dmDevices").asInt())
+
+        // A new link replaces the old one; devices already signed in stay in.
+        val newCode = t.dm.post("/api/campaigns/${t.id}/dm-link").json().get("code").asString()
+        assertEquals(404, Browser().get("/api/dm-sign-in/$code").statusCode())
+        assertEquals(404, Browser().post("/api/dm-sign-in/$code").statusCode())
+        assertEquals("DM", laptop.read("/api/campaigns/${t.id}").get("role").asString())
+
+        // The laptop signs out every other device: the first browser loses DM access.
+        assertEquals(1, laptop.post("/api/campaigns/${t.id}/dm-devices/sign-out-others").json().get("signedOut").asInt())
+        assertEquals(401, t.dm.get("/api/campaigns/${t.id}").statusCode())
+        assertEquals("DM", laptop.read("/api/campaigns/${t.id}").get("role").asString())
+        // ...and gets back in with the current link.
+        t.dm.post("/api/dm-sign-in/$newCode")
+        assertEquals("DM", t.dm.read("/api/campaigns/${t.id}").get("role").asString())
+    }
+
+    @Test
     fun `the home page lists this browser's campaigns`() {
         val t = Table()
         val (sam, _) = t.approvedPlayer("Sam")

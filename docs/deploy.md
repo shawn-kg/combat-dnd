@@ -51,7 +51,10 @@ docker run --rm -v "$PWD":/d postgres:18 pg_restore --clean --if-exists --no-own
 ## 4. Start playing
 
 1. Open the site and **start a campaign**: that browser becomes the DM.
-2. Send the join link to your players.
+2. Press **Make my DM sign-in link** and save the link somewhere private (a password manager or a private
+   note). Open it on your other devices to be the DM there too. Without it, clearing this browser's cookies
+   would lock you out of your own campaign.
+3. Send the join link to your players.
 
 ## Things to know about the free plan
 

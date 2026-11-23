@@ -40,7 +40,7 @@ class DevSeed(
     override fun run(args: ApplicationArguments) {
         jdbc.sql(
             """
-            insert into campaign (id, name, join_code, dm_token_hash) values (?, 'Dev campaign', 'DEV001', 'dev')
+            insert into campaign (id, name, join_code) values (?, 'Dev campaign', 'DEV001')
             on conflict (id) do nothing
             """.trimIndent(),
         ).param(DEV_CAMPAIGN).update()

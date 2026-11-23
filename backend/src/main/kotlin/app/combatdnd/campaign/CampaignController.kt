@@ -36,6 +36,28 @@ class CampaignController(private val service: CampaignService, private val limit
     @PostMapping("/campaigns/{id}/join-code/rotate")
     fun rotate(@PathVariable id: UUID, req: HttpServletRequest) = service.rotateJoinCode(req, id)
 
+    // ---------- the DM on other devices ----------
+
+    /** DM only: a new DM sign-in link (shown once; replaces the old one). */
+    @PostMapping("/campaigns/{id}/dm-link")
+    fun makeDmLink(@PathVariable id: UUID, req: HttpServletRequest) = service.makeDmLink(req, id)
+
+    @PostMapping("/campaigns/{id}/dm-devices/sign-out-others")
+    fun signOutOthers(@PathVariable id: UUID, req: HttpServletRequest) = service.signOutOtherDmDevices(req, id)
+
+    /** The DM sign-in page: which campaign the link is for, then signing in. Throttled like joining. */
+    @GetMapping("/dm-sign-in/{code}")
+    fun dmLinkInfo(@PathVariable code: String, req: HttpServletRequest): DmLinkInfo {
+        limiter.check(req)
+        return service.dmLinkInfo(code)
+    }
+
+    @PostMapping("/dm-sign-in/{code}")
+    fun useDmLink(@PathVariable code: String, req: HttpServletRequest, res: HttpServletResponse): DmLinkInfo {
+        limiter.check(req)
+        return service.useDmLink(req, res, code)
+    }
+
     // ---------- joining ----------
 
     @GetMapping("/join/{code}")

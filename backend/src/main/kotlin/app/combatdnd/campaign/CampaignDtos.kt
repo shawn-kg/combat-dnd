@@ -67,4 +67,14 @@ data class CampaignView(
     val templates: List<TemplateDto> = emptyList(),
     /** The DM sees every encounter, newest first; players only see fights that are under way. */
     val encounters: List<EncounterSummary> = emptyList(),
+    /** DM only: whether a DM sign-in link exists (it can't be shown again), and how many devices are signed in as DM. */
+    val dmLinkMade: Boolean = false,
+    val dmDevices: Int = 0,
 )
+
+/** The DM sign-in link's secret, shown once. The page builds the URL `/dm/<code>`. */
+data class DmLink(val code: String)
+
+data class DmLinkInfo(val campaignId: UUID, val campaignName: String)
+
+data class SignedOutDevices(val signedOut: Int)

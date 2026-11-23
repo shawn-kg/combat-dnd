@@ -24,7 +24,9 @@ data class SignedInPlayer(val id: UUID, val campaignId: UUID, val name: String, 
 /**
  * Who a browser is, per campaign. Each browser holds a random secret in an HttpOnly cookie
  * (`cdnd_dm_<campaign>` or `cdnd_pl_<campaign>`); the database stores only its SHA-256 hash.
- * No passwords: losing the cookie means rejoining with the link and the DM approving again.
+ * No passwords: a player who loses the cookie rejoins with the link and the DM approves again; a DM signs in
+ * on another device (or after clearing cookies) with their DM sign-in link. Each DM device has its own secret
+ * in `dm_device`.
  */
 @Component
 class Session(private val jdbc: JdbcClient) {
@@ -38,18 +40,18 @@ class Session(private val jdbc: JdbcClient) {
         fun hash(token: String): String =
             MessageDigest.getInstance("SHA-256").digest(token.toByteArray()).joinToString("") { "%02x".format(it) }
 
-        private fun equalHashes(a: String?, b: String?) =
-            a != null && b != null && MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
     }
 
     private fun cookie(request: HttpServletRequest, name: String): String? = request.cookies?.firstOrNull { it.name == name }?.value
 
     fun isDm(request: HttpServletRequest, campaignId: UUID): Boolean {
-        val token = cookie(request, DM_PREFIX + campaignId) ?: return false
-        val stored = jdbc.sql("select dm_token_hash from campaign where id = ?").param(campaignId)
-            .query(String::class.java).optional().orElse(null)
-        return equalHashes(stored, hash(token))
+        val token = dmToken(request, campaignId) ?: return false
+        return jdbc.sql("select count(*) from dm_device where campaign_id = ? and token_hash = ?")
+            .params(campaignId, hash(token)).query(Long::class.java).single() > 0
     }
+
+    /** This browser's DM secret for the campaign, if it has one (valid or not). */
+    fun dmToken(request: HttpServletRequest, campaignId: UUID): String? = cookie(request, DM_PREFIX + campaignId)
 
     /** The player this browser signed in as for this campaign, whatever their status; null if none or the token is stale. */
     fun player(request: HttpServletRequest, campaignId: UUID): SignedInPlayer? {

@@ -48,14 +48,129 @@ function useCampaignAction<V, R = unknown>(campaignId: string, fn: (v: V) => Pro
 // ======================= DM =======================
 
 function DmView({ c }: { c: CampaignView }) {
+  // Until the DM has a sign-in link, losing this browser's cookies would lock them out, so ask early (at the top).
+  // Decided once per visit: moving the card when the link is made would reset it and hide the new link.
+  const [devicesFirst] = useState(!c.dmLinkMade)
   return (
     <>
+      {devicesFirst && <DmDevices c={c} />}
       <Encounters c={c} />
       <JoinLink c={c} />
       <Players c={c} />
       <Characters c={c} />
       <Monsters c={c} />
+      {!devicesFirst && <DmDevices c={c} />}
     </>
+  )
+}
+
+/** Signing in as the DM on other devices: a secret link shown once, and signing out the others. */
+function DmDevices({ c }: { c: CampaignView }) {
+  const [link, setLink] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [confirm, setConfirm] = useState<'new' | 'signout' | null>(null)
+  const [signedOut, setSignedOut] = useState<number | null>(null)
+  const make = useCampaignAction(c.id, () => api<{ code: string }>('POST', `/campaigns/${c.id}/dm-link`))
+  const signOut = useCampaignAction(c.id, () => api<{ signedOut: number }>('POST', `/campaigns/${c.id}/dm-devices/sign-out-others`))
+  const error = make.error ?? signOut.error
+  const others = c.dmDevices - 1
+
+  const makeLink = () =>
+    make.mutate(undefined, {
+      onSuccess: (r) => {
+        setLink(`${window.location.origin}/dm/${r.code}`)
+        setConfirm(null)
+      },
+    })
+
+  return (
+    <section className="card">
+      <h3>Your devices</h3>
+      <p className="muted small">
+        Your DM sign-in link signs any browser in as the DM of this campaign: your other laptop, or this one if you clear its
+        cookies. Keep it private, like a password.
+      </p>
+      {link ? (
+        <>
+          <div className="lrow">
+            <code className="link-box">{link}</code>
+            <button
+              className="btn"
+              onClick={async () => {
+                await navigator.clipboard.writeText(link).catch(() => undefined)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? 'Copied ✓' : 'Copy'}
+            </button>
+          </div>
+          <p className="small">
+            <b>Save it somewhere safe now</b> (a password manager or a private note). It isn’t shown again; if you lose it, make a
+            new one here.
+          </p>
+        </>
+      ) : (
+        <div className="lrow">
+          {!c.dmLinkMade ? (
+            <button className="btn primary" disabled={make.isPending} onClick={makeLink}>
+              Make my DM sign-in link
+            </button>
+          ) : confirm === 'new' ? (
+            <>
+              <span className="small">The old link stops working. Devices already signed in stay signed in.</span>
+              <button className="btn danger" disabled={make.isPending} onClick={makeLink}>
+                Make a new link
+              </button>
+              <button className="btn" onClick={() => setConfirm(null)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="muted small">You have a DM sign-in link. For safety it can’t be shown again.</span>
+              <button className="btn" onClick={() => setConfirm('new')}>
+                New link…
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      <div className="lrow add-row">
+        <span className="muted small">
+          {others <= 0 ? 'Only this device is signed in as the DM.' : `Signed in as the DM here and on ${others} other ${others === 1 ? 'device' : 'devices'}.`}
+          {signedOut !== null && ` Signed out ${signedOut}.`}
+        </span>
+        <span className="spacer" />
+        {others > 0 &&
+          (confirm === 'signout' ? (
+            <>
+              <button
+                className="btn small danger"
+                disabled={signOut.isPending}
+                onClick={() =>
+                  signOut.mutate(undefined, {
+                    onSuccess: (r) => {
+                      setSignedOut(r.signedOut)
+                      setConfirm(null)
+                    },
+                  })
+                }
+              >
+                Sign them out
+              </button>
+              <button className="btn small" onClick={() => setConfirm(null)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="btn small" onClick={() => setConfirm('signout')}>
+              Sign out other devices…
+            </button>
+          ))}
+      </div>
+      {error && <div className="err">{(error as ApiError).message}</div>}
+    </section>
   )
 }
 
