@@ -1,3 +1,4 @@
+import { parseInitiative } from './initiative'
 import { describe, expect, it } from 'vitest'
 import type { AttackView, LastTurnView } from '../api/types'
 import { applyHpEdit, numberedNames } from './hpEdit'
@@ -63,5 +64,17 @@ describe('last turn lines', () => {
   it('makes initials', () => {
     expect(initials('Goblin Archer')).toBe('GA')
     expect(initials('Lyra')).toBe('L')
+  })
+})
+
+describe('parseInitiative', () => {
+  it('takes whole numbers, including negatives, and treats anything else as not rolled', () => {
+    expect(parseInitiative('17')).toBe(17)
+    expect(parseInitiative(' -1 ')).toBe(-1)
+    expect(parseInitiative('0')).toBe(0)
+    expect(parseInitiative('')).toBeNull()
+    expect(parseInitiative(undefined)).toBeNull()
+    expect(parseInitiative('12.5')).toBeNull()
+    expect(parseInitiative('abc')).toBeNull()
   })
 })

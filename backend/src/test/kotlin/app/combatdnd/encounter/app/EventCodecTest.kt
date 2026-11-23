@@ -32,6 +32,7 @@ class EventCodecTest {
             Event.DefeatedSet(lyra, true),
             Event.CombatantEdited(lyra, "Lyra the Bold", null, 16, null, 20, null),
             Event.Reordered(listOf(lyra, CombatantId("boss"))),
+            Event.InitiativesSet(mapOf(lyra to 15, CombatantId("boss") to 21)),
         )
         val covered = events.map { it::class }.toSet()
         assertEquals(Event::class.sealedSubclasses.toSet(), covered, "add new event types to this test")

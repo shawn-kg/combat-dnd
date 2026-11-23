@@ -36,4 +36,6 @@ sealed interface Event {
     ) : Event
 
     data class Reordered(val order: List<CombatantId>) : Event
+
+    data class InitiativesSet(val initiatives: Map<CombatantId, Int>) : Event
 }

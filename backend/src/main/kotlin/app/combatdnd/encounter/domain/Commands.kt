@@ -43,6 +43,12 @@ sealed interface Command {
         val maxHp: Int? = null,
     ) : Command
 
+    /**
+     * Everyone's initiative at once (the initiative step), then the list is sorted by it, highest first.
+     * Ties keep their current order, so the DM can break them afterwards with Reorder.
+     */
+    data class SetInitiatives(val initiatives: Map<CombatantId, Int>) : Command
+
     /** Manual order, e.g. to break an initiative tie. Must list every combatant once. */
     data class Reorder(val order: List<CombatantId>) : Command
 }

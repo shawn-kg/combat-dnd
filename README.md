@@ -49,8 +49,11 @@ When it prints **Ready**, open the two links it shows: one DM tab and one player
 To try campaigns, open http://localhost:5173, start a campaign as the DM, and open its join link in a private
 window (or another browser) to join as a player. Each browser keeps its own sign-in.
 
+As the DM, add characters and monsters, then make an encounter under **Encounters**: pick who's in it, add
+enemies, and press **Start combat** to roll initiative.
+
 The backend runs with the **dev** profile, which also seeds a goblin fight mid-combat that you can open with
-`?as=dm` or `?as=player:<id>` (the two links the script prints) until encounters arrive in milestone 4.
+`?as=dm` or `?as=player:<id>` (the two links the script prints), handy for trying the tracker quickly.
 
 <details>
 <summary>Running the pieces by hand</summary>

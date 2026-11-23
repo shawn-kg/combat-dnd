@@ -1,4 +1,6 @@
-// Mirrors backend/.../campaign/CampaignDtos.kt.
+// Mirrors backend/.../campaign/CampaignDtos.kt and encounter/prep/PrepDtos.kt.
+
+import type { EncounterStatus } from './types'
 
 export type PlayerStatus = 'PENDING' | 'APPROVED' | 'REMOVED'
 
@@ -40,6 +42,44 @@ export interface CampaignView {
   me: PlayerDto | null
   /** DM only: monster templates. */
   templates: TemplateDto[]
+  /** The DM sees every encounter, newest first; players only see fights under way. */
+  encounters: EncounterSummary[]
+}
+
+export interface EncounterSummary {
+  id: string
+  name: string
+  status: EncounterStatus
+}
+
+export interface PrepPartyMember {
+  characterId: string
+  name: string
+  portraitKey: string | null
+  ac: number
+  hp: number
+  maxHp: number
+  playerName: string | null
+  included: boolean
+}
+
+export interface PrepEnemy {
+  templateId: string
+  name: string
+  portraitKey: string | null
+  ac: number
+  maxHp: number
+  count: number
+  hidden: boolean
+}
+
+export interface PrepView {
+  id: string
+  campaignId: string
+  name: string
+  status: EncounterStatus
+  party: PrepPartyMember[]
+  enemies: PrepEnemy[]
 }
 
 export interface MyCampaign {

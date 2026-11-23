@@ -95,7 +95,7 @@ Postgres holds everything except image files, which go to object storage. A figh
 | `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords |
 | `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
 | `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |
-| `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), round, current_combatant_id, version | `version` guards against conflicting edits |
+| `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), version, locked_batch | `version` guards against conflicting edits; undo never goes back past `locked_batch` (the roster from Start combat) |
 | `encounter_event` | encounter_id, seq, batch, actor, type, payload, undone, created_at | Append-only; the fight itself: combatants added, attacks, edits, turn changes |
 
 An encounter's saved roster lives in two more tables: `encounter_party` (encounter_id, character_id, included) and `encounter_enemy` (encounter_id, monster_template_id, count, hidden). **Start combat** turns the roster into `CombatantAdded` events.
@@ -130,11 +130,17 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView
 
 - `decide` checks permissions only: the DM may do anything; a player may log attacks for their own character during its turn, and end their own turn. A player may also set their own character's current HP at any time, but not their AC, max HP or anyone else's numbers.
 - Current state is `events.fold(initial, ::evolve)`. Undo marks the last event undone and replays.
-- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `AddCombatants` (several as one undoable action), `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `Reorder`, `Undo`.
+- Commands: `LogAttack` (target, hit, damage), `EditAttack`, `DeleteAttack`, `NextTurn`, `PreviousTurn`, `AddCombatant`, `AddCombatants` (several as one undoable action), `RemoveCombatant`, `RevealCombatant`, `SetDefeated`, `EditCombatant` (name, portrait, initiative, AC, HP, max HP), `SetInitiatives` (everyone's roll at once, then a stable sort, so ties keep their order), `Reorder`, `Undo`.
 - `LogAttack` with a hit takes the damage off the target's HP, never below 0. `EditAttack` and `DeleteAttack` apply the difference, so HP always matches the log.
-- Party HP is written back to `character.current_hp`, so it carries over to the next fight.
+- Party HP is written back to `character.current_hp` when the fight ends, so it carries over to the next one.
 
-Starting and ending a fight: `StartCombat` (builds combatants from the roster, status becomes ROLLING_INITIATIVE), `SetInitiative`, `BeginRound1` (ACTIVE), and `EndCombat` (writes party HP back, status becomes ENDED). A player sets their own HP with `PATCH /api/characters/{cid}/hp`, between fights; during a fight they edit the HP on their own row. Roster edits during prep are plain CRUD: `PUT /api/encounters/{id}/roster`.
+Starting and ending a fight are DM-only endpoints rather than tracker commands, because they change the encounter's status:
+
+- **Start** (`POST /api/encounters/{id}/start`, PREPARING → ROLLING_INITIATIVE) builds combatants from the saved roster and writes them as the fight's first batch. Party combatants use the character's id, so HP can be written back; a claimed character is controlled by its player. Everyone starts at initiative 0. The batch is locked (`encounter.locked_batch`), so Undo can't take the roster back off.
+- **Begin** (`POST .../begin`, → ACTIVE) runs `NextTurn`: round 1, the first combatant who isn't hidden or defeated.
+- **End** (`POST .../end`, → ENDED) writes party HP back in the same transaction. Commands and undo on a PREPARING or ENDED encounter are rejected.
+
+A player sets their own HP with `PATCH /api/campaigns/{id}/characters/{cid}/hp` between fights; during a fight they edit the HP on their own row. Roster edits during prep are plain CRUD: `PUT /api/encounters/{id}/prep`, only while PREPARING.
 
 ### API
 
@@ -147,8 +153,11 @@ Starting and ending a fight: `StartCombat` (builds combatants from the roster, s
 | `POST /api/campaigns/{id}/characters/{cid}/claim` | A player chooses their character (once) |
 | `GET, POST, PUT, DELETE /api/campaigns/{id}/characters` and `/monster-templates` | DM CRUD |
 | `POST /api/campaigns/{id}/portraits` | DM uploads a portrait; returns its key |
-| `POST /api/campaigns/{id}/encounters` | Prep |
-| `POST /api/encounters/{id}/commands` | Every tracker command, with `expectedVersion` |
+| `POST /api/campaigns/{id}/encounters`, `DELETE /api/encounters/{id}` | DM creates or deletes an encounter (the campaign page lists them; players only see ones under way) |
+| `GET` and `PUT /api/encounters/{id}/prep` | DM: the saved roster (party with included flags, enemies with count and hidden) |
+| `POST /api/encounters/{id}/start`, `/begin`, `/end` | DM: start combat, begin round 1, end combat |
+| `GET /api/encounters/{id}/state` | This viewer's filtered tracker, including the encounter's `status` |
+| `POST /api/encounters/{id}/commands`, `/undo` | Every tracker command, with `expectedVersion`; DM undo |
 | `GET /api/encounters/{id}/stream` | SSE: this viewer's filtered tracker after every change |
 
 ### Request lifecycle
@@ -222,12 +231,12 @@ One Docker image on one Fly.io machine, Neon Postgres, and Cloudflare R2 for por
 
 ## Roadmap and open questions
 
-1. **Rework the repo for the tracker.** Replace the attack-flow rules with the tracker rules and tests, and update the schema. In progress.
-2. Tracker API: persistence, version checks, SSE.
-3. Tracker screen: rows, DM inline editing, Log attack, turn log.
-4. Campaign, join, lobby and choosing a character; characters and templates; portrait uploads.
-5. Encounter prep.
-6. Deploy to Fly.io and run a test session with the group.
+1. Rework the repo for the tracker: rules, schema and tests. Done.
+2. Tracker API and screen: persistence, version checks, SSE, rows, DM inline editing, Log attack, turn log. Done.
+3. Campaigns: join and approval, choosing a character, characters and monster templates, portrait uploads. Done.
+4. Prep and initiative: saved encounters, Start combat, the initiative step, Begin round 1, End combat with HP carried over. Done.
+5. Deploy on free hosting (Render, Neon, Cloudflare R2 for portraits) with backups.
+6. Polish (phone layout, light theme, error states) and a test session with the group.
 
 Open questions:
 

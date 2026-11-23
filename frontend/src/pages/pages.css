@@ -226,3 +226,29 @@
   object-fit: cover;
   border: 2px solid var(--party);
 }
+
+/* ---------- encounters ---------- */
+.list-row.live {
+  border-color: var(--gold);
+}
+.tag.status-active,
+.tag.status-rolling_initiative {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.card.fight-on {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+.prep-row {
+  cursor: default;
+}
+label.prep-row {
+  cursor: pointer;
+}
+.prep-row.off {
+  opacity: 0.5;
+}
+.prep-row.enemy {
+  border-left: 3px solid var(--enemy);
+}

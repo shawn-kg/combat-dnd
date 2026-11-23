@@ -19,15 +19,19 @@ export function Tracker({
   connected,
   send,
   undo,
+  end,
 }: {
   view: EncounterView
   connected: boolean
   send: (command: Command) => Promise<SendResult>
   undo: () => Promise<SendResult>
+  /** DM only: end the fight. */
+  end?: () => Promise<SendResult>
 }) {
   const [logFor, setLogFor] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [ending, setEnding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef<number | undefined>(undefined)
   const dm = view.viewerIsDm
@@ -134,6 +138,34 @@ export function Tracker({
         ))}
       </ol>
 
+      {dm && end && !ending && (
+        <div className="lrow end-row">
+          <span className="spacer" />
+          <button type="button" className="btn small danger" onClick={() => setEnding(true)}>
+            End combat…
+          </button>
+        </div>
+      )}
+      {dm && end && ending && (
+        <div className="notice confirm" role="alertdialog" aria-label="End combat">
+          <span>End {view.name}? Everyone’s HP is saved to their character, and the tracker closes for everyone.</span>
+          <span className="spacer" />
+          <button
+            type="button"
+            className="btn small danger"
+            onClick={async () => {
+              const r = await end()
+              if (!r.ok) show(r.message)
+              setEnding(false)
+            }}
+          >
+            End combat
+          </button>
+          <button type="button" className="btn small" onClick={() => setEnding(false)}>
+            Keep fighting
+          </button>
+        </div>
+      )}
       {dm && <TurnLog view={view} act={act} />}
     </section>
   )

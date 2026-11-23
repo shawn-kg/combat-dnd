@@ -39,8 +39,8 @@ class EncounterHub {
         return emitter
     }
 
-    fun broadcast(id: UUID, state: EncounterState, name: String, campaignId: UUID) {
-        subscribers[id]?.forEach { send(it, viewFor(state, it.actor).toDto(name, campaignId)) }
+    fun broadcast(id: UUID, state: EncounterState, header: Header) {
+        subscribers[id]?.forEach { send(it, viewFor(state, it.actor).toDto(header)) }
     }
 
     fun connectionCount(id: UUID): Int = subscribers[id]?.size ?: 0

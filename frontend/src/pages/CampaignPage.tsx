@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import type { CampaignView, CharacterDto, TemplateDto } from '../api/campaign'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { CampaignView, CharacterDto, EncounterSummary, TemplateDto } from '../api/campaign'
+import type { EncounterStatus } from '../api/types'
 import { api, ApiError } from '../api/client'
 import { applyHpEdit } from '../combat/hpEdit'
 import { Portrait } from '../combat/Portrait'
@@ -39,7 +40,7 @@ export function CampaignPage() {
 }
 
 /** Runs a mutation, then refreshes the campaign. Errors come back as `error` for inline display. */
-function useCampaignAction<V>(campaignId: string, fn: (v: V) => Promise<unknown>) {
+function useCampaignAction<V, R = unknown>(campaignId: string, fn: (v: V) => Promise<R>) {
   const qc = useQueryClient()
   return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: ['campaign', campaignId] }) })
 }
@@ -49,12 +50,88 @@ function useCampaignAction<V>(campaignId: string, fn: (v: V) => Promise<unknown>
 function DmView({ c }: { c: CampaignView }) {
   return (
     <>
+      <Encounters c={c} />
       <JoinLink c={c} />
       <Players c={c} />
       <Characters c={c} />
       <Monsters c={c} />
-      <p className="muted small">Encounters (prep, initiative and the tracker) come in the next milestone.</p>
     </>
+  )
+}
+
+const STATUS_LABEL: Record<EncounterStatus, string> = {
+  PREPARING: 'Setting up',
+  ROLLING_INITIATIVE: 'Rolling initiative',
+  ACTIVE: 'In combat',
+  ENDED: 'Over',
+}
+
+/** Where an encounter opens: its prep page while it's being set up, the tracker after that. */
+function encounterLink(campaignId: string, e: EncounterSummary) {
+  return e.status === 'PREPARING' ? `/c/${campaignId}/encounters/${e.id}` : `/combat/${e.id}`
+}
+
+function Encounters({ c }: { c: CampaignView }) {
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const create = useCampaignAction(c.id, (n: string) => api<{ id: string }>('POST', `/campaigns/${c.id}/encounters`, { name: n }))
+  const remove = useCampaignAction(c.id, (id: string) => api('DELETE', `/encounters/${id}`))
+  const error = create.error ?? remove.error
+
+  return (
+    <section className="card">
+      <h3>Encounters</h3>
+      <p className="muted small">Set fights up before the session, then start one when the party walks into it.</p>
+      {c.encounters.length > 0 && (
+        <div className="list">
+          {c.encounters.map((e) => (
+            <div key={e.id} className={`list-row${e.status === 'ACTIVE' || e.status === 'ROLLING_INITIATIVE' ? ' live' : ''}`}>
+              <Link to={encounterLink(c.id, e)}>
+                <b>{e.name}</b>
+              </Link>
+              <span className={`tag status-${e.status.toLowerCase()}`}>{STATUS_LABEL[e.status]}</span>
+              <span className="spacer" />
+              {deleting === e.id ? (
+                <>
+                  <span className="small">Delete it for good?</span>
+                  <button className="btn small danger" onClick={() => remove.mutate(e.id, { onSettled: () => setDeleting(null) })}>
+                    Delete
+                  </button>
+                  <button className="btn small" onClick={() => setDeleting(null)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link className="btn small" to={encounterLink(c.id, e)}>
+                    {e.status === 'PREPARING' ? 'Set up' : e.status === 'ENDED' ? 'View' : 'Open'}
+                  </Link>
+                  <button className="btn small" aria-label={`Delete ${e.name}`} onClick={() => setDeleting(e.id)}>
+                    ✕
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <form
+        className="lrow add-row"
+        onSubmit={(ev) => {
+          ev.preventDefault()
+          const n = name.trim()
+          if (!n) return
+          create.mutate(n, { onSuccess: (r) => navigate(`/c/${c.id}/encounters/${r.id}`) })
+        }}
+      >
+        <input className="field w" aria-label="New encounter name" placeholder="e.g. Goblin ambush" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="btn small primary" disabled={!name.trim() || create.isPending}>
+          + New encounter
+        </button>
+      </form>
+      {error && <div className="err">{(error as ApiError).message}</div>}
+    </section>
   )
 }
 
@@ -445,6 +522,20 @@ function PlayerView({ c }: { c: CampaignView }) {
   if (!mine) return <ChooseCharacter c={c} />
   return (
     <>
+      {c.encounters.map((e) => (
+        <section key={e.id} className="card fight-on">
+          <div className="lrow">
+            <span>
+              <b>{e.name}</b>{' '}
+              <span className="muted small">{e.status === 'ACTIVE' ? 'is under way' : 'is starting: initiative is being rolled'}</span>
+            </span>
+            <span className="spacer" />
+            <Link className="btn primary" to={`/combat/${e.id}`}>
+              Join the fight ▶
+            </Link>
+          </div>
+        </section>
+      ))}
       <MyCharacter c={c} ch={mine} />
       <section className="card">
         <h3>The party</h3>
@@ -463,7 +554,7 @@ function PlayerView({ c }: { c: CampaignView }) {
             ))}
         </div>
       </section>
-      <p className="muted small">When the DM starts a fight, it opens from here.</p>
+      {c.encounters.length === 0 && <p className="muted small">When the DM starts a fight, it opens from here.</p>}
     </>
   )
 }

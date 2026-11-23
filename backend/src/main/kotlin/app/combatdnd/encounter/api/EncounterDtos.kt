@@ -1,5 +1,7 @@
 package app.combatdnd.encounter.api
 
+import app.combatdnd.encounter.app.EncounterStatus
+import app.combatdnd.encounter.app.Header
 import app.combatdnd.encounter.domain.AttackId
 import app.combatdnd.encounter.domain.AttackView
 import app.combatdnd.encounter.domain.Combatant
@@ -19,6 +21,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 data class EncounterViewDto(
     val campaignId: String,
     val name: String,
+    /** PREPARING, ROLLING_INITIATIVE, ACTIVE or ENDED. */
+    val status: EncounterStatus,
     val viewerIsDm: Boolean,
     val round: Int,
     val currentId: String?,
@@ -55,8 +59,8 @@ data class AttackViewDto(
     val damage: Int,
 )
 
-fun EncounterView.toDto(name: String, campaignId: java.util.UUID) =
-    EncounterViewDto(campaignId.toString(), name, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
+fun EncounterView.toDto(h: Header) =
+    EncounterViewDto(h.campaignId.toString(), h.name, h.status, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
     id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),
@@ -82,6 +86,7 @@ private fun AttackView.toDto() = AttackViewDto(id.value, round, attackerId.value
     JsonSubTypes.Type(CommandRequest.SetDefeated::class, name = "SetDefeated"),
     JsonSubTypes.Type(CommandRequest.EditCombatant::class, name = "EditCombatant"),
     JsonSubTypes.Type(CommandRequest.Reorder::class, name = "Reorder"),
+    JsonSubTypes.Type(CommandRequest.SetInitiatives::class, name = "SetInitiatives"),
 )
 sealed interface CommandRequest {
     val expectedVersion: Long?
@@ -164,6 +169,11 @@ sealed interface CommandRequest {
 
     data class Reorder(val order: List<String>, override val expectedVersion: Long? = null) : CommandRequest {
         override fun toCommand() = Command.Reorder(order.map(::CombatantId))
+    }
+
+    /** {"type":"SetInitiatives","initiatives":{"<combatant id>": 17, ...}} */
+    data class SetInitiatives(val initiatives: Map<String, Int>, override val expectedVersion: Long? = null) : CommandRequest {
+        override fun toCommand() = Command.SetInitiatives(initiatives.mapKeys { CombatantId(it.key) })
     }
 }
 

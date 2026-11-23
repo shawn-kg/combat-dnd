@@ -29,7 +29,7 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
   }, [encounterId, asParam])
 
   const post = useCallback(
-    async (path: 'commands' | 'undo', body?: object): Promise<SendResult> => {
+    async (path: 'commands' | 'undo' | 'begin' | 'end', body?: object): Promise<SendResult> => {
       try {
         const res = await fetch(`/api/encounters/${encounterId}/${path}${asParam}`, {
           method: 'POST',
@@ -58,5 +58,11 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
   /** DM only: reverses the last command. */
   const undo = useCallback(() => post('undo'), [post])
 
-  return { view, connected, send, undo }
+  /** DM only: initiative is in, start round 1. */
+  const begin = useCallback(() => post('begin'), [post])
+
+  /** DM only: end the fight; party HP is saved to the characters. */
+  const end = useCallback(() => post('end'), [post])
+
+  return { view, connected, send, undo, begin, end }
 }

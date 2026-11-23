@@ -128,6 +128,13 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
             }
         }
 
+        is Command.SetInitiatives -> when {
+            !isDm -> forbidden(DM_ONLY)
+            cmd.initiatives.isEmpty() -> invalid("Enter at least one initiative.")
+            cmd.initiatives.keys.any { it !in state.combatants } -> invalid("Unknown combatant.")
+            else -> ok(Event.InitiativesSet(cmd.initiatives))
+        }
+
         is Command.Reorder -> when {
             !isDm -> forbidden(DM_ONLY)
             cmd.order.size != state.order.size || cmd.order.toSet() != state.order.toSet() ->

@@ -207,6 +207,16 @@ class DmEditingTest {
     }
 
     @Test
+    fun `setting everyone's initiative sorts once, keeping ties in their current order`() {
+        val s = ambush().run(
+            Actor.Dm to Command.SetInitiatives(mapOf(BOSS to 10, LYRA to 18, GOB1 to 10, ARCHER to 5, BRAM to 18)),
+        )
+        assertEquals(listOf(LYRA, BRAM, BOSS, GOB1, ARCHER), s.order)
+        assertIs<Decision.Rejected>(decide(ambush(), Command.SetInitiatives(mapOf(LYRA to 20)), lyraActor))
+        assertIs<Decision.Rejected>(decide(ambush(), Command.SetInitiatives(mapOf(CombatantId("nobody") to 3)), Actor.Dm))
+    }
+
+    @Test
     fun `new enemies slot into initiative order`() {
         val gob = Combatant(CombatantId("gob2"), "Goblin 2", Side.ENEMY, Controller.Dm, initiative = 16, ac = 13, hp = 7, maxHp = 7)
         val s = ambush().run(Actor.Dm to Command.AddCombatant(gob))
