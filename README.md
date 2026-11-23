@@ -30,7 +30,8 @@ fly.toml    One always-on machine (state and SSE live in memory)
 
 ## Run it locally
 
-You need Java 21, Node 22 and Docker (Docker Desktop running). Then, from the repo folder:
+You need Java 21, Node 22 and Docker. On WSL the script opens Docker Desktop for you if it isn't running.
+Then, from the repo folder:
 
 ```bash
 ./scripts/dev.sh

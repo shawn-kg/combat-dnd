@@ -31,9 +31,26 @@ command -v node >/dev/null || fail "Node isn't installed. Install nvm, then: nvm
 node_major=$(node -p 'process.versions.node.split(".")[0]')
 [[ "$node_major" -ge 22 ]] || fail "Node 22 or newer is needed (found $(node -v)). Run: nvm install 22 && nvm alias default 22"
 command -v curl >/dev/null || fail "curl isn't installed. Run: sudo apt install -y curl"
-if $USE_DOCKER; then
-  command -v docker >/dev/null || fail "Docker isn't installed. See the README, or use --no-docker with your own Postgres."
-  docker info >/dev/null 2>&1 || fail "Docker isn't running. Open Docker Desktop, wait for the whale icon, and try again."
+
+# Docker: on WSL, open Docker Desktop if it isn't running yet and wait for it.
+docker_ready() { command -v docker >/dev/null && docker info >/dev/null 2>&1; }
+is_wsl() { grep -qi microsoft /proc/version 2>/dev/null; }
+DOCKER_DESKTOP_WIN='C:\Program Files\Docker\Docker\Docker Desktop.exe'
+DOCKER_DESKTOP_WSL='/mnt/c/Program Files/Docker/Docker/Docker Desktop.exe'
+if $USE_DOCKER && ! docker_ready; then
+  if is_wsl && [[ -f "$DOCKER_DESKTOP_WSL" ]]; then
+    say "Docker isn't running, so opening Docker Desktop (this can take a minute)"
+    # Started through Windows so it outlives this script; run from /mnt/c to avoid cmd.exe's UNC-path warning.
+    (cd /mnt/c && cmd.exe /c start "" "$DOCKER_DESKTOP_WIN" >/dev/null 2>&1) || true
+    for _ in $(seq 1 60); do docker_ready && break; sleep 3; done
+    docker_ready || fail "Docker Desktop didn't become ready within 3 minutes. Open it yourself, check that
+       Settings > Resources > WSL integration is on for this Ubuntu, and run the script again."
+    say "Docker is ready"
+  elif command -v docker >/dev/null; then
+    fail "Docker isn't running. Open Docker Desktop (or on plain Linux: sudo systemctl start docker) and try again."
+  else
+    fail "Docker isn't installed. See the README, or use --no-docker with your own Postgres."
+  fi
 fi
 if curl -s -o /dev/null localhost:8080; then
   fail "Something is already using port 8080. Is another copy of the backend still running?"
