@@ -106,4 +106,6 @@ cd frontend && npm run lint && npm test && npm run build
    adding party members mid-fight, End combat with HP carried over.
 7. Deploy: free Render web service + Neon Postgres (portraits live in Postgres too), nightly backups.
    Setup steps are in [docs/deploy.md](docs/deploy.md).
-8. A compact layout for a small window beside D&D Beyond, phone layout, light theme, then a test session.
+8. ~~Compact layout~~ for a small window beside D&D Beyond (and phones), with Pop out.
+9. ~~Polish~~: light/dark theme toggle, clear messages for missing pages, crashes, a sleeping server and
+   fights you can't open. Then a real session: see [docs/session-day.md](docs/session-day.md).

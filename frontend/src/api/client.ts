@@ -1,3 +1,8 @@
+/** What to say when the host answers instead of the app: it's starting up (the free plan sleeps) or restarting. */
+export const WAKING_UP = 'The server is starting up. On the free plan it sleeps when nobody’s using it and takes about a minute to wake. Try again shortly.'
+
+const isWakingUp = (status: number) => status === 502 || status === 503 || status === 504
+
 /** An API error with the server's own message, ready to show to the user. */
 export class ApiError extends Error {
   readonly status: number
@@ -18,7 +23,7 @@ export async function upload<T = unknown>(path: string, file: File): Promise<T> 
     throw new ApiError("Can't reach the server. Check your connection.", 0)
   }
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(data?.message ?? 'The upload failed. Try again.', res.status)
+  if (!res.ok) throw new ApiError(data?.message ?? (isWakingUp(res.status) ? WAKING_UP : 'The upload failed. Try again.'), res.status)
   return data as T
 }
 
@@ -37,6 +42,6 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   }
   if (res.status === 204) return undefined as T
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(data?.message ?? 'Something went wrong. Try again.', res.status)
+  if (!res.ok) throw new ApiError(data?.message ?? (isWakingUp(res.status) ? WAKING_UP : 'Something went wrong. Try again.'), res.status)
   return data as T
 }

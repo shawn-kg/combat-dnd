@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class EncounterNotFound(id: UUID) : RuntimeException("No encounter $id.")
+class EncounterNotFound(id: UUID) : RuntimeException("That fight doesn't exist. The DM may have deleted it.")
 class StaleVersion : RuntimeException("The table changed. Check and try again.")
 class CommandRejected(val reason: Reason, message: String) : RuntimeException(message)
 
