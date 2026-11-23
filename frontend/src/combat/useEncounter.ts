@@ -28,6 +28,18 @@ export function useEncounter(encounterId: string, devActor?: string | null) {
     return () => source.close()
   }, [encounterId, asParam])
 
+  // The free host puts the server to sleep after 15 minutes without incoming requests, and the live stream
+  // only sends data the other way. While someone has the tracker open and visible, a tiny request every
+  // 10 minutes keeps it awake through a quiet stretch of the session. A hidden tab doesn't, so an idle
+  // laptop doesn't keep the server up all week.
+  useEffect(() => {
+    const ping = () => {
+      if (document.visibilityState === 'visible') fetch('/actuator/health').catch(() => undefined)
+    }
+    const timer = window.setInterval(ping, 10 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   const post = useCallback(
     async (path: 'commands' | 'undo' | 'begin' | 'end', body?: object): Promise<SendResult> => {
       try {

@@ -1,5 +1,5 @@
 # Local Postgres for development. Matches the defaults in backend/src/main/resources/application.yml.
-# Portraits are stored in a local folder in development (see docs/design.md, "Infrastructure"), so no storage service is needed.
+# Portraits are stored in Postgres too, so no storage service is needed.
 services:
   db:
     image: postgres:17

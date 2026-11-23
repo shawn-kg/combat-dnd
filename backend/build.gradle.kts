@@ -48,3 +48,6 @@ tasks.withType<Test> {
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     systemProperty("spring.profiles.active", System.getProperty("spring.profiles.active") ?: "dev")
 }
+
+// Only the runnable jar: the Dockerfile copies build/libs/combat-dnd-*.jar and must match exactly one file.
+tasks.named<Jar>("jar") { enabled = false }

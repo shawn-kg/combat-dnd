@@ -1,43 +1,33 @@
 package app.combatdnd.portrait
 
 import app.combatdnd.web.BadRequest
-import org.springframework.beans.factory.annotation.Value
+import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
 import java.awt.Color
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import java.util.UUID
 import javax.imageio.IIOImage
 import javax.imageio.ImageIO
 import javax.imageio.ImageWriteParam
 
-/** Where portrait files live. Local disk for now; Cloudflare R2 (S3-compatible) arrives with deployment. */
+/** Where portrait files live. */
 interface PortraitStore {
     fun save(key: String, bytes: ByteArray)
     fun load(key: String): ByteArray?
 }
 
+/** Portraits in Postgres (table `portrait`). A few KB each, so a whole campaign's worth is tiny. */
 @Component
-class LocalPortraitStore(@Value("\${combat.portraits.dir:./data/portraits}") dir: String) : PortraitStore {
-    private val root: Path = Path.of(dir).toAbsolutePath().normalize()
-
-    private fun resolve(key: String): Path {
-        val path = root.resolve(key).normalize()
-        require(path.startsWith(root)) { "Bad portrait key" } // no ../ escapes
-        return path
-    }
-
+class DbPortraitStore(private val jdbc: JdbcClient) : PortraitStore {
     override fun save(key: String, bytes: ByteArray) {
-        val path = resolve(key)
-        Files.createDirectories(path.parent)
-        Files.write(path, bytes)
+        jdbc.sql("insert into portrait (key, bytes) values (?, ?)").params(key, bytes).update()
     }
 
-    override fun load(key: String): ByteArray? = runCatching { resolve(key) }.getOrNull()?.takeIf(Files::isRegularFile)?.let(Files::readAllBytes)
+    override fun load(key: String): ByteArray? =
+        jdbc.sql("select bytes from portrait where key = ?").param(key).query(ByteArray::class.java).optional().orElse(null)
 }
 
 /**

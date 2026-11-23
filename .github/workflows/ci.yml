@@ -54,14 +54,9 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Uncomment once the Fly app exists and FLY_API_TOKEN is set in the repo's secrets.
-  # deploy:
-  #   if: github.ref == 'refs/heads/main'
-  #   needs: [backend, frontend]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: superfly/flyctl-actions/setup-flyctl@master
-  #     - run: flyctl deploy --remote-only
-  #       env:
-  #         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  # Builds the production image the way Render does, so a broken Dockerfile shows up here, not at deploy time.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t combat-dnd .

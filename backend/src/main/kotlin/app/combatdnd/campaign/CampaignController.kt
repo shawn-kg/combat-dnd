@@ -118,7 +118,9 @@ class JoinRateLimiter {
     private val hits = ConcurrentHashMap<String, MutableList<Long>>()
 
     fun check(req: HttpServletRequest) {
-        val key = req.getHeader("X-Forwarded-For")?.substringBefore(',')?.trim() ?: req.remoteAddr
+        // Behind the host's proxy, the last X-Forwarded-For entry is the one the proxy added (the real client).
+        // Earlier entries come from the client and could be made up to dodge the limit.
+        val key = req.getHeader("X-Forwarded-For")?.substringAfterLast(',')?.trim()?.ifEmpty { null } ?: req.remoteAddr
         val now = System.currentTimeMillis()
         val list = hits.computeIfAbsent(key) { mutableListOf() }
         val allowed = synchronized(list) {

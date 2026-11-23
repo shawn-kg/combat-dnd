@@ -25,7 +25,7 @@ frontend/   Vite, React 19, TypeScript, React Router, TanStack Query
   src/styles/tokens.css     Design tokens (dark default, light theme)
   src/combat/               useEncounter (SSE + commands), Tracker rows
 Dockerfile  frontend build -> jar with static files -> JRE image
-fly.toml    One always-on machine (state and SSE live in memory)
+render.yaml Free Render web service (see docs/deploy.md); Neon Postgres; nightly backups in Actions
 ```
 
 ## Run it locally
@@ -102,6 +102,8 @@ cd frontend && npm run lint && npm test && npm run build
    turn log, and has Previous, Next and Undo (N and U keys).
 5. Campaigns and people: ~~start a campaign, join link, DM approval, choosing a character once, the DM's
    characters, players setting their own HP, sign-in cookies~~ (3a); ~~monster templates and portrait uploads~~ (3b).
-   Portraits are saved under `backend/data/portraits` in development.
-6. Encounter prep.
-7. Deploy to Fly.io and run a test session.
+6. ~~Prep and initiative~~: saved encounters, Start combat, players and the DM entering initiative, Begin round 1,
+   adding party members mid-fight, End combat with HP carried over.
+7. Deploy: free Render web service + Neon Postgres (portraits live in Postgres too), nightly backups.
+   Setup steps are in [docs/deploy.md](docs/deploy.md).
+8. A compact layout for a small window beside D&D Beyond, phone layout, light theme, then a test session.

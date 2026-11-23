@@ -5,6 +5,11 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/combat_dnd}
     username: ${DATABASE_USER:combat}
     password: ${DATABASE_PASSWORD:combat}
+    hikari:
+      # Small pool, and no idle connections kept open, so the free Neon database can sleep between sessions.
+      maximum-pool-size: 5
+      minimum-idle: 0
+      idle-timeout: 60000
   threads:
     virtual:
       enabled: true
@@ -14,12 +19,9 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
-combat:
-  portraits:
-    # Local folder for uploaded portraits. Deployment switches this to Cloudflare R2.
-    dir: ${PORTRAITS_DIR:./data/portraits}
-
 server:
+  # Hosts like Render pass the port to listen on in PORT.
+  port: ${PORT:8080}
   shutdown: graceful
 
 management:
@@ -27,3 +29,8 @@ management:
     web:
       exposure:
         include: health
+  health:
+    # The host checks /actuator/health constantly. Without this it would query the database each time and
+    # keep the free Neon database from ever sleeping. Startup (Flyway) already fails if the database is unreachable.
+    db:
+      enabled: false

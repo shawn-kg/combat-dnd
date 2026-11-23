@@ -213,21 +213,25 @@ The tracker is one list of rows in initiative order, like D&D Beyond. Dark is th
 
 ## Infrastructure
 
-One Docker image on one Fly.io machine, Neon Postgres, and Cloudflare R2 for portraits, for an estimated $5–7 a month. Prices are approximate; check current pricing before committing.
+Free: one Docker image on a Render free web service, with Neon's free Postgres. Portraits are stored in Postgres too. Setup steps are in `docs/deploy.md`.
 
-| Piece | Choice | Approximate cost |
+| Piece | Choice | Cost |
 | --- | --- | --- |
-| App | Fly.io, 1 shared-CPU machine with 1 GB RAM | $5–7/month |
-| Database | Neon serverless Postgres | Free tier |
-| Portraits | Cloudflare R2 (S3-compatible), 256 × 256 images of a few KB each | Free tier |
-| Domain | `combat-dnd.fly.dev` with TLS included | $0 |
-| Backups | Nightly `pg_dump` to R2, kept 30 days | Free tier |
+| App | Render free web service (512 MB, 0.1 CPU), built from the Dockerfile | $0 |
+| Database | Neon free Postgres (1 GB, 100 compute-hours a month, sleeps after 5 idle minutes) | $0 |
+| Portraits | A `portrait` table in Postgres: 256 × 256 JPEGs of a few KB each | $0 |
+| Domain | `combat-dnd.onrender.com` (or similar) with TLS included | $0 |
+| Backups | Nightly `pg_dump` in GitHub Actions, kept as an artifact for 30 days; plus Neon's 6-hour restore window | $0 |
 
-- **Build:** a three-stage Dockerfile (Node builds the frontend, Gradle builds the jar with it inside, a Java 21 JRE runs it). Flyway migrates on startup.
-- **CI:** GitHub Actions runs backend tests and frontend lint and build on every push and pull request. Deploy on merge to main is ready in `ci.yml`, commented out until the Fly app exists.
-- **One machine, always running,** because the encounter cache and SSE connections live in memory. Don't deploy mid-session.
-- **Locally:** `docker compose up` starts Postgres, portraits are saved to a local folder instead of R2, then `./gradlew bootRun` and `npm run dev`.
-- **Security:** tokens are 32 random bytes, stored hashed, in `HttpOnly; Secure; SameSite=Lax` cookies; POSTs require an `X-Requested-With` header; the join endpoint is rate limited; R2 credentials live in `fly secrets`.
+- **Sleeping:** the free web service sleeps after 15 minutes without incoming requests, and the first visit after that takes about a minute while it starts. Nothing is lost: every fight is rebuilt from its events. Open the site a minute before the session. While a tracker is open and visible, the page sends a tiny request every 10 minutes so a quiet stretch doesn't put it to sleep.
+- **Why not a local folder or R2 for portraits:** the free host's disk is wiped on every restart, and portraits are small enough that Postgres is simpler and they're included in backups.
+- **Build:** a three-stage Dockerfile (Node builds the frontend, Gradle builds the jar with it inside, a Java 21 JRE runs it), with JVM settings sized for 512 MB (about 180 MB used in testing). Flyway migrates on startup.
+- **CI and deploys:** GitHub Actions runs backend tests (against Postgres), frontend lint, tests and build, and a Docker image build on every push and pull request. Render deploys `main` only after those checks pass. Don't merge mid-session: a deploy restarts the server.
+- **One instance,** because the encounter cache and SSE connections live in memory.
+- **Database URL:** `DATABASE_URL` can be pasted exactly as Neon shows it (`postgresql://user:password@host/db?sslmode=require`); the app converts it for JDBC.
+- **Locally:** `./scripts/dev.sh` starts Postgres in Docker, the backend and the frontend.
+- **Security:** tokens are 32 random bytes, stored hashed, in `HttpOnly; Secure; SameSite=Lax` cookies; POSTs require an `X-Requested-With` header; the join endpoint is rate limited by the client address the host's proxy reports; the database URL is a secret in Render and GitHub, never in the repo.
+- **If free stops being enough:** Render's paid Starter instance removes sleeping; Fly.io is the other option. The Docker image works on either.
 
 ## Roadmap and open questions
 
@@ -235,8 +239,8 @@ One Docker image on one Fly.io machine, Neon Postgres, and Cloudflare R2 for por
 2. Tracker API and screen: persistence, version checks, SSE, rows, DM inline editing, Log attack, turn log. Done.
 3. Campaigns: join and approval, choosing a character, characters and monster templates, portrait uploads. Done.
 4. Prep and initiative: saved encounters, Start combat, the initiative step, Begin round 1, End combat with HP carried over. Done.
-5. Deploy on free hosting (Render, Neon, Cloudflare R2 for portraits) with backups.
-6. Polish (phone layout, light theme, error states) and a test session with the group.
+5. Deploy on free hosting (Render and Neon, portraits in Postgres) with nightly backups. Ready; needs the Render and Neon accounts (docs/deploy.md).
+6. A compact layout for a small window beside D&D Beyond, phone layout, light theme, error states, and a test session with the group.
 
 Open questions:
 
