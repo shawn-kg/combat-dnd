@@ -12,7 +12,8 @@ value class PlayerId(val value: String)
 @JvmInline
 value class AttackId(val value: String)
 
-enum class Side { PARTY, ENEMY }
+/** PARTY: the players' characters. ENEMY: monsters. NPC: the DM's other people, neither party nor monster. */
+enum class Side { PARTY, ENEMY, NPC }
 
 /** Who is sending a command. */
 sealed interface Actor {
@@ -44,6 +45,8 @@ data class Combatant(
     val portraitKey: String? = null,
     val hidden: Boolean = false,
     val defeated: Boolean = false,
+    /** NPCs only: whether players see its AC and HP (party members' are always shown, enemies' never). */
+    val statsVisible: Boolean = false,
 )
 
 /** One logged attack. `applied` is the HP actually removed (damage is capped at the target's HP). */

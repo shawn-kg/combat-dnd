@@ -45,6 +45,8 @@ data class CombatantViewDto(
     val maxHp: Int?,
     val hidden: Boolean,
     val defeated: Boolean,
+    /** NPCs: whether players see AC and HP. */
+    val statsVisible: Boolean,
     val lastTurn: LastTurnDto?,
 )
 
@@ -64,7 +66,7 @@ fun EncounterView.toDto(h: Header) =
     EncounterViewDto(h.campaignId.toString(), h.name, h.status, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
-    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, runByPlayer, ac, hp, maxHp, hidden, defeated, lastTurn?.toDto(),
+    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, runByPlayer, ac, hp, maxHp, hidden, defeated, statsVisible, lastTurn?.toDto(),
 )
 
 private fun LastTurnView.toDto() = LastTurnDto(round, hits, misses, damage, attacks.map { it.toDto() })
@@ -133,10 +135,11 @@ sealed interface CommandRequest {
         val maxHp: Int,
         val portraitKey: String? = null,
         val hidden: Boolean = false,
+        val statsVisible: Boolean = false,
         override val expectedVersion: Long? = null,
     ) : CommandRequest {
         override fun toCommand() =
-            Command.AddCombatant(NewCombatant(id, name, side, playerId, initiative, ac, hp, maxHp, portraitKey, hidden).toCombatant())
+            Command.AddCombatant(NewCombatant(id, name, side, playerId, initiative, ac, hp, maxHp, portraitKey, hidden, statsVisible).toCombatant())
     }
 
     /** Several at once, as one command, so one Undo removes them all. */
@@ -164,9 +167,10 @@ sealed interface CommandRequest {
         val ac: Int? = null,
         val hp: Int? = null,
         val maxHp: Int? = null,
+        val statsVisible: Boolean? = null,
         override val expectedVersion: Long? = null,
     ) : CommandRequest {
-        override fun toCommand() = Command.EditCombatant(CombatantId(id), name, portraitKey, initiative, ac, hp, maxHp)
+        override fun toCommand() = Command.EditCombatant(CombatantId(id), name, portraitKey, initiative, ac, hp, maxHp, statsVisible)
     }
 
     data class Reorder(val order: List<String>, override val expectedVersion: Long? = null) : CommandRequest {
@@ -197,6 +201,7 @@ data class NewCombatant(
     val maxHp: Int,
     val portraitKey: String? = null,
     val hidden: Boolean = false,
+    val statsVisible: Boolean = false,
 ) {
     fun toCombatant() = Combatant(
         id = CombatantId(id),
@@ -209,6 +214,7 @@ data class NewCombatant(
         maxHp = maxHp,
         portraitKey = portraitKey,
         hidden = hidden,
+        statsVisible = statsVisible,
     )
 }
 

@@ -27,6 +27,7 @@ data class CombatantView(
     val maxHp: Int?,
     val hidden: Boolean,
     val defeated: Boolean,
+    val statsVisible: Boolean,
     val lastTurn: LastTurnView?,
 )
 
@@ -58,7 +59,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
         .map(state::combatant)
         .filter { visible(it.id) }
         .map { c ->
-            val seesStats = isDm || c.side == Side.PARTY
+            val seesStats = isDm || c.side == Side.PARTY || (c.side == Side.NPC && c.statsVisible)
             CombatantView(
                 id = c.id,
                 name = c.name,
@@ -73,6 +74,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
                 maxHp = if (seesStats) c.maxHp else null,
                 hidden = c.hidden,
                 defeated = c.defeated,
+                statsVisible = c.statsVisible,
                 lastTurn = state.lastTurn(c.id).takeIf { it.isNotEmpty() }?.let { entries ->
                     LastTurnView(
                         round = entries.first().round,

@@ -33,6 +33,7 @@ sealed interface Event {
         val ac: Int?,
         val hp: Int?,
         val maxHp: Int?,
+        val statsVisible: Boolean? = null, // added later; older events don't have it
     ) : Event
 
     data class Reordered(val order: List<CombatantId>) : Event
