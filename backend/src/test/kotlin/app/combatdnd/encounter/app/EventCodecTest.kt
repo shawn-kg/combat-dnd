@@ -23,6 +23,7 @@ class EventCodecTest {
                 Combatant(lyra, "Lyra", Side.PARTY, Controller.Player(PlayerId("p1")), 15, 15, 22, 27, portraitKey = "img/l.webp"),
             ),
             Event.CombatantAdded(Combatant(CombatantId("boss"), "Goblin Boss", Side.ENEMY, Controller.Dm, 21, 15, 30, 30, hidden = true)),
+            Event.CombatantAdded(Combatant(CombatantId("mira"), "Mira", Side.NPC, Controller.Dm, 12, 14, 20, 24, statsVisible = true)),
             Event.AttackLogged(AttackId("a1"), 3, lyra, CombatantId("boss"), hit = true, damage = 9),
             Event.AttackEdited(AttackId("a1"), hit = false, damage = 0),
             Event.AttackDeleted(AttackId("a1")),
@@ -31,6 +32,7 @@ class EventCodecTest {
             Event.CombatantRevealed(lyra),
             Event.DefeatedSet(lyra, true),
             Event.CombatantEdited(lyra, "Lyra the Bold", null, 16, null, 20, null),
+            Event.CombatantEdited(CombatantId("mira"), null, null, null, null, null, null, statsVisible = false),
             Event.Reordered(listOf(lyra, CombatantId("boss"))),
             Event.InitiativeRolled(lyra, 14),
             Event.InitiativesSet(mapOf(lyra to 15, CombatantId("boss") to 21)),
@@ -38,6 +40,22 @@ class EventCodecTest {
         val covered = events.map { it::class }.toSet()
         assertEquals(Event::class.sealedSubclasses.toSet(), covered, "add new event types to this test")
         events.forEach { e -> assertEquals(e, codec.decode(codec.typeOf(e), codec.encode(e))) }
+    }
+
+    @Test
+    fun `fights saved before NPCs existed still load`() {
+        // Stored before Combatant.statsVisible and CombatantEdited.statsVisible were added.
+        val added = codec.decode(
+            "CombatantAdded",
+            """{"combatant":{"id":"boss","name":"Goblin Boss","side":"ENEMY","controller":{"kind":"dm"},"initiative":21,"ac":15,"hp":30,"maxHp":30,"portraitKey":null,"hidden":false,"defeated":false}}""",
+        ) as Event.CombatantAdded
+        assertEquals(false, added.combatant.statsVisible)
+        val edited = codec.decode(
+            "CombatantEdited",
+            """{"id":"boss","name":null,"portraitKey":null,"initiative":null,"ac":null,"hp":12,"maxHp":null}""",
+        ) as Event.CombatantEdited
+        assertEquals(null, edited.statsVisible)
+        assertEquals(12, edited.hp)
     }
 
     @Test

@@ -41,6 +41,8 @@ sealed interface Command {
         val ac: Int? = null,
         val hp: Int? = null,
         val maxHp: Int? = null,
+        /** NPCs: show or hide AC and HP from players. */
+        val statsVisible: Boolean? = null,
     ) : Command
 
     /**

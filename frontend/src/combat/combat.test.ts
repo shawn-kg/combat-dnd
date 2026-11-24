@@ -1,7 +1,8 @@
 import { parseInitiative } from './initiative'
 import { charactersNotInFight } from './partyMembers'
+import { targetGroups } from './targets'
 import { describe, expect, it } from 'vitest'
-import type { AttackView, LastTurnView } from '../api/types'
+import type { AttackView, CombatantView, LastTurnView } from '../api/types'
 import { applyHpEdit, numberedNames } from './hpEdit'
 import { describeAttack, initials, totalLine } from './lastTurn'
 
@@ -85,5 +86,16 @@ describe('charactersNotInFight', () => {
   it('offers only characters whose id is not already a combatant', () => {
     const view = { combatants: [{ id: 'lyra' }, { id: 'goblin-1' }] } as unknown as Parameters<typeof charactersNotInFight>[1]
     expect(charactersNotInFight([ch('lyra', 'Lyra'), ch('bram', 'Bram')], view).map((c) => c.name)).toEqual(['Bram'])
+  })
+})
+
+describe('targetGroups', () => {
+  const c = (id: string, side: 'PARTY' | 'ENEMY' | 'NPC', defeated = false) => ({ id, name: id, side, defeated }) as unknown as CombatantView
+  const all = [c('lyra', 'PARTY'), c('bram', 'PARTY'), c('gob', 'ENEMY'), c('dead', 'ENEMY', true), c('mira', 'NPC')]
+  const names = (g: ReturnType<typeof targetGroups>) => g.map(([h, list]) => `${h}: ${list.map((x) => x.id).join(',')}`)
+  it('puts the likely targets first, leaves out the attacker, the defeated and empty groups', () => {
+    expect(names(targetGroups(all[0], all))).toEqual(['Enemies: gob', 'NPCs: mira', 'Party: bram'])
+    expect(names(targetGroups(all[2], all))).toEqual(['Party: lyra,bram', 'NPCs: mira'])
+    expect(names(targetGroups(all[4], all))).toEqual(['Enemies: gob', 'Party: lyra,bram'])
   })
 })

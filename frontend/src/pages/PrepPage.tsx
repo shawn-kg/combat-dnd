@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import type { CampaignView, PrepEnemy, PrepPartyMember, PrepView } from '../api/campaign'
+import type { CampaignView, PrepEnemy, PrepNpc, PrepPartyMember, PrepView } from '../api/campaign'
 import { api, ApiError } from '../api/client'
 import { Portrait } from '../combat/Portrait'
 import { Steps } from '../combat/Steps'
@@ -11,12 +11,14 @@ interface Draft {
   name: string
   party: PrepPartyMember[]
   enemies: PrepEnemy[]
+  npcs: PrepNpc[]
 }
 
 const toBody = (d: Draft) => ({
   name: d.name,
   party: d.party.map((p) => ({ characterId: p.characterId, included: p.included })),
   enemies: d.enemies.map((e) => ({ templateId: e.templateId, count: e.count, hidden: e.hidden })),
+  npcs: d.npcs.filter((n) => n.included).map((n) => ({ npcId: n.npcId, hidden: n.hidden })),
 })
 
 /** The DM sets up one encounter ahead of time: who's playing, which monsters. Saved as you go. */
@@ -43,7 +45,12 @@ export function PrepPage() {
 function PrepForm({ initial, campaign }: { initial: PrepView; campaign: CampaignView }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [draft, setDraftState] = useState<Draft>({ name: initial.name, party: initial.party, enemies: initial.enemies })
+  const [draft, setDraftState] = useState<Draft>({
+    name: initial.name,
+    party: initial.party,
+    enemies: initial.enemies,
+    npcs: initial.npcs,
+  })
   const [saved, setSaved] = useState<'saved' | 'saving' | 'error'>('saved')
   const [error, setError] = useState<string | null>(null)
   const first = useRef(true)
@@ -92,6 +99,8 @@ function PrepForm({ initial, campaign }: { initial: PrepView; campaign: Campaign
     setDraft((d) => ({ ...d, party: d.party.map((p) => (p.characterId === id ? { ...p, included } : p)) }))
   const setEnemy = (i: number, patch: Partial<PrepEnemy>) =>
     setDraft((d) => ({ ...d, enemies: d.enemies.map((e, j) => (j === i ? { ...e, ...patch } : e)) }))
+  const setNpc = (id: string, patch: Partial<PrepNpc>) =>
+    setDraft((d) => ({ ...d, npcs: d.npcs.map((n) => (n.npcId === id ? { ...n, ...patch } : n)) }))
   const removeEnemy = (i: number) => setDraft((d) => ({ ...d, enemies: d.enemies.filter((_, j) => j !== i) }))
   const addEnemy = (templateId: string) =>
     setDraft((d) => {
@@ -101,7 +110,8 @@ function PrepForm({ initial, campaign }: { initial: PrepView; campaign: Campaign
       return { ...d, enemies: [...d.enemies, { templateId, name: t.name, portraitKey: t.portraitKey, ac: t.ac, maxHp: t.maxHp, count: 1, hidden: false }] }
     })
 
-  const inFight = draft.party.filter((p) => p.included).length + draft.enemies.reduce((n, e) => n + e.count, 0)
+  const inFight =
+    draft.party.filter((p) => p.included).length + draft.npcs.filter((n) => n.included).length + draft.enemies.reduce((n, e) => n + e.count, 0)
 
   return (
     <main className="page stack">
@@ -148,6 +158,37 @@ function PrepForm({ initial, campaign }: { initial: PrepView; campaign: Campaign
                 AC {p.ac} · {p.hp}/{p.maxHp} HP
               </span>
             </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <h3>NPCs</h3>
+        {draft.npcs.length === 0 ? (
+          <p className="muted small">
+            No NPCs yet. Add guides, rivals and hirelings on the <Link to={`/c/${initial.campaignId}`}>campaign page</Link>.
+          </p>
+        ) : (
+          <p className="muted small">Tick the NPCs in this fight. You run them, like enemies.</p>
+        )}
+        <div className="list">
+          {draft.npcs.map((n) => (
+            <div key={n.npcId} className={`list-row prep-row npc${n.included ? '' : ' off'}`}>
+              <input type="checkbox" checked={n.included} onChange={(e) => setNpc(n.npcId, { included: e.target.checked })} aria-label={`${n.name} is in this fight`} />
+              <Portrait c={n} size="mini" />
+              <span className="grow">
+                <b>{n.name}</b>{' '}
+                <span className="muted small">{n.statsVisible ? 'players see AC and HP' : 'AC and HP hidden from players'}</span>
+              </span>
+              <span className="muted small num">
+                AC {n.ac} · {n.hp}/{n.maxHp} HP
+              </span>
+              {n.included && (
+                <label className="small">
+                  <input type="checkbox" checked={n.hidden} onChange={(e) => setNpc(n.npcId, { hidden: e.target.checked })} /> Hidden
+                </label>
+              )}
+            </div>
           ))}
         </div>
       </section>

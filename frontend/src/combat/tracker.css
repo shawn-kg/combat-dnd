@@ -601,3 +601,13 @@
   font-weight: 600;
   color: var(--hp-low);
 }
+
+/* ---------- NPCs: purple, between the party's teal and the enemies' red ---------- */
+.item.npc,
+.ini.npc {
+  border-left-color: var(--npc);
+}
+.npc .portrait {
+  border-color: var(--npc);
+  background: var(--npc-bg);
+}

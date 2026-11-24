@@ -81,7 +81,7 @@ export function Initiative({
 
       <ol className="ini-list">
         {rows.map((c, i) => (
-          <li key={c.id} className={`ini ${c.side === 'ENEMY' ? 'enemy' : 'party'}`}>
+          <li key={c.id} className={`ini ${c.side === 'ENEMY' ? 'enemy' : c.side === 'NPC' ? 'npc' : 'party'}`}>
             <Portrait c={c} />
             <span className="grow">
               <span className="nm">{c.name}</span> {c.hidden && <span className="tag">Hidden</span>}
@@ -89,6 +89,8 @@ export function Initiative({
               <span className="muted small">
                 {c.side === 'ENEMY'
                   ? 'Enemy'
+                  : c.side === 'NPC'
+                    ? 'NPC · run by you'
                   : !c.runByPlayer
                     ? 'Party · run by you'
                     : c.initiative !== 0 && draft[c.id] === undefined

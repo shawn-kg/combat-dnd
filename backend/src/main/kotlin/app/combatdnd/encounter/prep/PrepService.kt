@@ -22,7 +22,7 @@ import java.util.UUID
 
 /**
  * The DM's side of an encounter's life: create it, save who's in it ahead of the session,
- * start it (the roster goes onto the tracker), begin round 1, end it (party HP carries over), delete it.
+ * start it (the roster goes onto the tracker), begin round 1, end it (party and NPC HP carries over), delete it.
  */
 @Service
 class PrepService(
@@ -58,7 +58,11 @@ class PrepService(
         val enemies = prep.enemies(encounterId).mapNotNull { e ->
             templates[e.templateId]?.let { PrepEnemy(it.id, it.name, it.portraitKey, it.ac, it.maxHp, e.count, e.hidden) }
         }
-        return PrepView(encounterId, campaignId, meta.name, meta.status, party, enemies)
+        val inFight = prep.npcs(encounterId)
+        val npcs = campaigns.npcs(campaignId).map {
+            PrepNpc(it.id, it.name, it.portraitKey, it.ac, it.hp, it.maxHp, it.statsVisible, it.id in inFight, inFight[it.id] ?: false)
+        }
+        return PrepView(encounterId, campaignId, meta.name, meta.status, party, enemies, npcs)
     }
 
     @Transactional
@@ -70,8 +74,10 @@ class PrepService(
         if (body.party.any { it.characterId !in characters }) throw BadRequest("That character isn't in this campaign.")
         if (body.enemies.any { it.templateId !in templates }) throw BadRequest("That monster isn't in this campaign.")
         if (body.enemies.any { it.count !in 1..20 }) throw BadRequest("Between 1 and 20 of each monster.")
+        val npcs = campaigns.npcs(campaignId).map { it.id }.toSet()
+        if (body.npcs.any { it.npcId !in npcs }) throw BadRequest("That NPC isn't in this campaign.")
         prep.rename(encounterId, cleanName(body.name))
-        prep.replace(encounterId, body.party.distinctBy { it.characterId }, body.enemies)
+        prep.replace(encounterId, body.party.distinctBy { it.characterId }, body.enemies, body.npcs.distinctBy { it.npcId })
     }
 
     fun delete(req: HttpServletRequest, encounterId: UUID) {
@@ -118,7 +124,26 @@ class PrepService(
                 )
             }
         }
-        return service.start(encounterId, Actor.Dm, party + enemies)
+        // NPCs use their own id, so End combat can save their HP like a character's.
+        val npcRows = campaigns.npcs(campaignId).associateBy { it.id }
+        val npcs = prep.npcs(encounterId).mapNotNull { (id, hidden) ->
+            npcRows[id]?.let {
+                Combatant(
+                    id = CombatantId(it.id.toString()),
+                    name = it.name,
+                    side = Side.NPC,
+                    controller = Controller.Dm,
+                    initiative = 0,
+                    ac = it.ac,
+                    hp = it.hp,
+                    maxHp = it.maxHp,
+                    portraitKey = it.portraitKey,
+                    hidden = hidden,
+                    statsVisible = it.statsVisible,
+                )
+            }
+        }
+        return service.start(encounterId, Actor.Dm, party + npcs + enemies)
     }
 
     fun begin(req: HttpServletRequest, encounterId: UUID): Long {
@@ -130,10 +155,14 @@ class PrepService(
     fun end(req: HttpServletRequest, encounterId: UUID): Long {
         val campaignId = dmOf(req, encounterId)
         val characters = campaigns.characters(campaignId).map { it.id.toString() }.toSet()
+        val npcs = campaigns.npcs(campaignId).map { it.id.toString() }.toSet()
         return service.end(encounterId, Actor.Dm) { state ->
-            state.combatants.values
-                .filter { it.side == Side.PARTY && it.id.value in characters }
-                .forEach { prep.saveHp(campaignId, UUID.fromString(it.id.value), it.hp) }
+            state.combatants.values.forEach {
+                when {
+                    it.side == Side.PARTY && it.id.value in characters -> prep.saveHp(campaignId, UUID.fromString(it.id.value), it.hp)
+                    it.side == Side.NPC && it.id.value in npcs -> prep.saveNpcHp(campaignId, UUID.fromString(it.id.value), it.hp)
+                }
+            }
         }
     }
 }

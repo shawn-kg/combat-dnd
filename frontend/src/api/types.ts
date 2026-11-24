@@ -1,6 +1,7 @@
 // Mirrors EncounterViewDto in backend/.../encounter/api/EncounterDtos.kt.
 
-export type Side = 'PARTY' | 'ENEMY'
+/** PARTY: player characters. ENEMY: monsters. NPC: the DM's other people. */
+export type Side = 'PARTY' | 'ENEMY' | 'NPC'
 
 export interface AttackView {
   id: string
@@ -37,6 +38,8 @@ export interface CombatantView {
   maxHp: number | null
   hidden: boolean
   defeated: boolean
+  /** NPCs: whether players see AC and HP. */
+  statsVisible: boolean
   lastTurn: LastTurnView | null
 }
 

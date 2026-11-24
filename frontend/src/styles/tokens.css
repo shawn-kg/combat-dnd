@@ -22,6 +22,9 @@
   --hp-low: #d9534f;
   --react: #a18fd8;
   --react-bg: #2a2540;
+  /* NPCs: neither party (teal) nor enemy (red). Follows the theme through --react. */
+  --npc: var(--react);
+  --npc-bg: var(--react-bg);
 
   --font-display: 'Cinzel', 'Trajan Pro', Georgia, serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

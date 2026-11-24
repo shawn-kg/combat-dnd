@@ -22,6 +22,17 @@ data class CharacterRequest(
 
 data class HpRequest(val hp: Int)
 
+data class NpcRequest(
+    val name: String,
+    val ac: Int,
+    val maxHp: Int,
+    /** Defaults to max HP for a new NPC. */
+    val hp: Int? = null,
+    val portraitKey: String? = null,
+    /** Whether players see its AC and HP on the tracker. */
+    val statsVisible: Boolean = false,
+)
+
 data class TemplateRequest(val name: String, val ac: Int, val maxHp: Int, val portraitKey: String? = null)
 
 // ---------- responses ----------
@@ -51,6 +62,16 @@ data class CharacterDto(
     val playerName: String?,
 )
 
+data class NpcDto(
+    val id: UUID,
+    val name: String,
+    val portraitKey: String?,
+    val ac: Int,
+    val hp: Int,
+    val maxHp: Int,
+    val statsVisible: Boolean,
+)
+
 data class TemplateDto(val id: UUID, val name: String, val portraitKey: String?, val ac: Int, val maxHp: Int)
 
 /** What a browser sees on a campaign's home page. `joinCode` and `templates` are only sent to the DM. */
@@ -70,6 +91,8 @@ data class CampaignView(
     /** DM only: whether a DM sign-in link exists (it can't be shown again), and how many devices are signed in as DM. */
     val dmLinkMade: Boolean = false,
     val dmDevices: Int = 0,
+    /** DM only: NPCs can be secret, so players don't get the list. */
+    val npcs: List<NpcDto> = emptyList(),
 )
 
 /** The DM sign-in link's secret, shown once. The page builds the URL `/dm/<code>`. */

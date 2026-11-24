@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CombatantView, Command, EncounterView } from '../api/types'
 import { AddEnemy } from './AddEnemy'
+import { AddNpc } from './AddNpc'
 import { AddPartyMember } from './AddPartyMember'
 import { Editable } from './Editable'
 import { applyHpEdit } from './hpEdit'
@@ -43,7 +44,7 @@ export function Tracker({
 }) {
   const [logFor, setLogFor] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
-  const [adding, setAdding] = useState<'enemy' | 'party' | null>(null)
+  const [adding, setAdding] = useState<'enemy' | 'party' | 'npc' | null>(null)
   const [ending, setEnding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef<number | undefined>(undefined)
@@ -139,12 +140,13 @@ export function Tracker({
             <button type="button" className="chip" aria-pressed={adding === 'party'} onClick={() => setAdding('party')}>
               Party member
             </button>
+            <button type="button" className="chip" aria-pressed={adding === 'npc'} onClick={() => setAdding('npc')}>
+              NPC
+            </button>
           </div>
-          {adding === 'enemy' ? (
-            <AddEnemy view={view} act={act} onClose={() => setAdding(null)} />
-          ) : (
-            <AddPartyMember view={view} act={act} onClose={() => setAdding(null)} />
-          )}
+          {adding === 'enemy' && <AddEnemy view={view} act={act} onClose={() => setAdding(null)} />}
+          {adding === 'party' && <AddPartyMember view={view} act={act} onClose={() => setAdding(null)} />}
+          {adding === 'npc' && <AddNpc view={view} act={act} onClose={() => setAdding(null)} />}
         </>
       )}
 
@@ -226,7 +228,7 @@ function TrackerRow({
   onLog: () => void
   children?: ReactNode
 }) {
-  const side = c.side === 'ENEMY' ? 'enemy' : 'party'
+  const side = c.side === 'ENEMY' ? 'enemy' : c.side === 'NPC' ? 'npc' : 'party'
   const classes = ['item', side, c.isCurrent && 'current', c.defeated && 'defeated', c.hidden && 'hidden']
   const edit = (patch: Record<string, unknown>) => act({ type: 'EditCombatant', id: c.id, ...patch })
   const editInt = (field: string) => (text: string) => {
@@ -311,6 +313,11 @@ function TrackerRow({
           {c.hidden && (
             <button type="button" className="btn small" onClick={() => act({ type: 'RevealCombatant', id: c.id })}>
               Reveal to players
+            </button>
+          )}
+          {c.side === 'NPC' && (
+            <button type="button" className="btn small" onClick={() => edit({ statsVisible: !c.statsVisible })}>
+              {c.statsVisible ? 'Hide AC & HP from players' : 'Show AC & HP to players'}
             </button>
           )}
           <button type="button" className="btn small" onClick={() => act({ type: 'SetDefeated', id: c.id, defeated: !c.defeated })}>

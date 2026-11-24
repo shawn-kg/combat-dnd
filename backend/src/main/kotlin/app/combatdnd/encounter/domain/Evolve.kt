@@ -63,6 +63,7 @@ fun evolve(state: EncounterState, event: Event): EncounterState {
                     ac = event.ac ?: c.ac,
                     maxHp = maxHp,
                     hp = (event.hp ?: c.hp).coerceAtMost(maxHp),
+                    statsVisible = event.statsVisible ?: c.statsVisible,
                 )
             }
             if (event.initiative != null) edited.copy(order = sortByInitiative(edited)) else edited

@@ -104,6 +104,21 @@ class CampaignController(private val service: CampaignService, private val limit
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unassign(@PathVariable id: UUID, @PathVariable characterId: UUID, req: HttpServletRequest) = service.unassign(req, id, characterId)
 
+    // ---------- NPCs ----------
+
+    @PostMapping("/campaigns/{id}/npcs")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun createNpc(@PathVariable id: UUID, @RequestBody body: NpcRequest, req: HttpServletRequest) = service.createNpc(req, id, body)
+
+    @PutMapping("/campaigns/{id}/npcs/{npcId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun updateNpc(@PathVariable id: UUID, @PathVariable npcId: UUID, @RequestBody body: NpcRequest, req: HttpServletRequest) =
+        service.updateNpc(req, id, npcId, body)
+
+    @DeleteMapping("/campaigns/{id}/npcs/{npcId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteNpc(@PathVariable id: UUID, @PathVariable npcId: UUID, req: HttpServletRequest) = service.deleteNpc(req, id, npcId)
+
     // ---------- monster templates ----------
 
     @PostMapping("/campaigns/{id}/monster-templates")

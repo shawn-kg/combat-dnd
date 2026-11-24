@@ -16,6 +16,20 @@ data class PrepView(
     /** Every character in the campaign; untick the ones who aren't playing. */
     val party: List<PrepPartyMember>,
     val enemies: List<PrepEnemy>,
+    /** Every NPC in the campaign; `included` ones are in this fight. */
+    val npcs: List<PrepNpc> = emptyList(),
+)
+
+data class PrepNpc(
+    val npcId: UUID,
+    val name: String,
+    val portraitKey: String?,
+    val ac: Int,
+    val hp: Int,
+    val maxHp: Int,
+    val statsVisible: Boolean,
+    val included: Boolean,
+    val hidden: Boolean,
 )
 
 data class PrepPartyMember(
@@ -40,7 +54,15 @@ data class PrepEnemy(
 )
 
 /** Saves the whole setup at once. Characters left out of `party` count as included. */
-data class PrepRequest(val name: String, val party: List<PartyChoice> = emptyList(), val enemies: List<EnemyChoice> = emptyList())
+data class PrepRequest(
+    val name: String,
+    val party: List<PartyChoice> = emptyList(),
+    val enemies: List<EnemyChoice> = emptyList(),
+    /** The NPCs in this fight (others are left out). */
+    val npcs: List<NpcChoice> = emptyList(),
+)
+
+data class NpcChoice(val npcId: UUID, val hidden: Boolean = false)
 
 data class PartyChoice(val characterId: UUID, val included: Boolean)
 

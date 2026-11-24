@@ -118,7 +118,7 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
             val c = state.combatants[cmd.id]
             val maxHp = cmd.maxHp ?: c?.maxHp ?: 0
             // Players may set their own character's HP, and nothing else.
-            val onlyHp = cmd.hp != null && listOf(cmd.name, cmd.portraitKey, cmd.initiative, cmd.ac, cmd.maxHp).all { it == null }
+            val onlyHp = cmd.hp != null && listOf(cmd.name, cmd.portraitKey, cmd.initiative, cmd.ac, cmd.maxHp, cmd.statsVisible).all { it == null }
             when {
                 c == null -> invalid("Unknown combatant.")
                 !isDm && !actor.controls(c) -> forbidden(DM_ONLY)
@@ -127,7 +127,7 @@ fun decide(state: EncounterState, cmd: Command, actor: Actor): Decision {
                 maxHp <= 0 -> invalid("Max HP must be above 0.")
                 cmd.hp != null && cmd.hp !in 0..maxHp -> invalid("HP must be between 0 and $maxHp.")
                 cmd.ac != null && cmd.ac < 0 -> invalid("AC can't be negative.")
-                else -> ok(Event.CombatantEdited(cmd.id, cmd.name?.trim(), cmd.portraitKey, cmd.initiative, cmd.ac, cmd.hp, cmd.maxHp))
+                else -> ok(Event.CombatantEdited(cmd.id, cmd.name?.trim(), cmd.portraitKey, cmd.initiative, cmd.ac, cmd.hp, cmd.maxHp, cmd.statsVisible))
             }
         }
 
