@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import type { CampaignView, CharacterDto, EncounterSummary, TemplateDto } from '../api/campaign'
+import type { CampaignView, CharacterDto, EncounterSummary, NpcDto, TemplateDto } from '../api/campaign'
 import type { EncounterStatus } from '../api/types'
 import { api, ApiError } from '../api/client'
 import { applyHpEdit } from '../combat/hpEdit'
@@ -58,6 +58,7 @@ function DmView({ c }: { c: CampaignView }) {
       <JoinLink c={c} />
       <Players c={c} />
       <Characters c={c} />
+      <Npcs c={c} />
       <Monsters c={c} />
       {!devicesFirst && <DmDevices c={c} />}
     </>
@@ -365,12 +366,12 @@ function Players({ c }: { c: CampaignView }) {
 }
 
 type Draft = { name: string; ac: string; hp: string; maxHp: string }
-const toDraft = (ch?: CharacterDto): Draft => ({ name: ch?.name ?? '', ac: ch ? String(ch.ac) : '', hp: ch ? String(ch.hp) : '', maxHp: ch ? String(ch.maxHp) : '' })
+const toDraft = (ch?: CharacterDto | NpcDto): Draft => ({ name: ch?.name ?? '', ac: ch ? String(ch.ac) : '', hp: ch ? String(ch.hp) : '', maxHp: ch ? String(ch.maxHp) : '' })
 
 /** Turns the form into a request, or a reason it isn't ready. */
-function fromDraft(d: Draft, isNew: boolean): { body: Record<string, unknown> } | { error: string } {
+function fromDraft(d: Draft, isNew: boolean, what = 'character'): { body: Record<string, unknown> } | { error: string } {
   const [ac, maxHp] = [Number(d.ac), Number(d.maxHp)]
-  if (!d.name.trim()) return { error: 'Give the character a name.' }
+  if (!d.name.trim()) return { error: `Give the ${what} a name.` }
   if (d.ac === '' || d.maxHp === '' || !Number.isInteger(ac) || !Number.isInteger(maxHp) || maxHp <= 0) return { error: 'Enter AC and max HP.' }
   const hp = d.hp === '' ? (isNew ? maxHp : undefined) : Number(d.hp)
   if (hp !== undefined && (!Number.isInteger(hp) || hp < 0 || hp > maxHp)) return { error: `HP must be between 0 and ${maxHp}.` }
@@ -496,6 +497,138 @@ function Characters({ c }: { c: CampaignView }) {
         >
           {fields}
           <button className="btn primary">Add character</button>
+        </form>
+      )}
+      {(formError || error) && <div className="err">{formError ?? (error as ApiError).message}</div>}
+    </section>
+  )
+}
+
+/** DM only: NPCs, the DM's other people. Like characters, each is one person whose HP carries over. */
+function Npcs({ c }: { c: CampaignView }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Draft>(toDraft())
+  const [showStats, setShowStats] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const save = useCampaignAction(c.id, ({ id, body }: { id?: string; body: Record<string, unknown> }) =>
+    id ? api('PUT', `/campaigns/${c.id}/npcs/${id}`, body) : api('POST', `/campaigns/${c.id}/npcs`, body),
+  )
+  const del = useCampaignAction(c.id, (id: string) => api('DELETE', `/campaigns/${c.id}/npcs/${id}`))
+  const error = save.error ?? del.error
+  const bodyOf = (n: NpcDto) => ({ name: n.name, ac: n.ac, maxHp: n.maxHp, hp: n.hp, portraitKey: n.portraitKey, statsVisible: n.statsVisible })
+
+  function submit(id?: string) {
+    const r = fromDraft(draft, !id, 'NPC')
+    if ('error' in r) return setFormError(r.error)
+    setFormError(null)
+    const portraitKey = id ? c.npcs.find((n) => n.id === id)?.portraitKey : undefined
+    save.mutate(
+      { id, body: { ...r.body, portraitKey, statsVisible: showStats } },
+      {
+        onSuccess: () => {
+          setEditing(null)
+          setDraft(toDraft())
+          setShowStats(false)
+        },
+      },
+    )
+  }
+
+  const fields = (
+    <>
+      <input className="field grow" aria-label="NPC name" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      <input className="field n" type="number" aria-label="NPC AC" placeholder="AC" value={draft.ac} onChange={(e) => setDraft({ ...draft, ac: e.target.value })} />
+      <input className="field n" type="number" aria-label="NPC HP" placeholder="HP" value={draft.hp} onChange={(e) => setDraft({ ...draft, hp: e.target.value })} />
+      <input className="field n" type="number" aria-label="NPC max HP" placeholder="Max HP" value={draft.maxHp} onChange={(e) => setDraft({ ...draft, maxHp: e.target.value })} />
+      <label className="small">
+        <input type="checkbox" checked={showStats} onChange={(e) => setShowStats(e.target.checked)} /> Players see AC and HP
+      </label>
+    </>
+  )
+
+  return (
+    <section className="card">
+      <h3>NPCs</h3>
+      <p className="muted small">
+        People who aren’t in the party and aren’t monsters: a guide, a rival, a hireling. You run them in fights, and their HP carries over
+        like a character’s. Players only see their AC and HP if you tick the box. Players don’t see this list.
+      </p>
+      <div className="list">
+        {c.npcs.map((n) =>
+          editing === n.id ? (
+            <form
+              key={n.id}
+              className="list-row"
+              onSubmit={(e) => {
+                e.preventDefault()
+                submit(n.id)
+              }}
+            >
+              {fields}
+              <button className="btn small primary">Save</button>
+              <button type="button" className="btn small" onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <div key={n.id} className="list-row npc-row">
+              <PortraitPicker campaignId={c.id} c={n} onUploaded={(portraitKey) => save.mutate({ id: n.id, body: { ...bodyOf(n), portraitKey } })} />
+              <b>{n.name}</b>
+              <span className="muted small num">
+                AC {n.ac} · {n.hp}/{n.maxHp} HP
+              </span>
+              <label className="small" title="Whether players see this NPC's AC and HP on the tracker">
+                <input
+                  type="checkbox"
+                  checked={n.statsVisible}
+                  onChange={(e) => save.mutate({ id: n.id, body: { ...bodyOf(n), statsVisible: e.target.checked } })}
+                />{' '}
+                Players see AC and HP
+              </label>
+              <span className="spacer" />
+              {deleting === n.id ? (
+                <>
+                  <span className="small">Delete {n.name}?</span>
+                  <button className="btn small danger" onClick={() => del.mutate(n.id, { onSuccess: () => setDeleting(null) })}>
+                    Delete
+                  </button>
+                  <button className="btn small" onClick={() => setDeleting(null)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="btn small"
+                    onClick={() => {
+                      setDraft(toDraft(n))
+                      setShowStats(n.statsVisible)
+                      setFormError(null)
+                      setEditing(n.id)
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button className="btn small danger" onClick={() => setDeleting(n.id)}>
+                    Delete…
+                  </button>
+                </>
+              )}
+            </div>
+          ),
+        )}
+      </div>
+      {editing === null && (
+        <form
+          className="lrow add-row"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          {fields}
+          <button className="btn primary">Add NPC</button>
         </form>
       )}
       {(formError || error) && <div className="err">{formError ?? (error as ApiError).message}</div>}

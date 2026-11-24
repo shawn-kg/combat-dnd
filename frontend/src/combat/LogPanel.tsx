@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CombatantView, EncounterView } from '../api/types'
 import type { Act } from './Tracker'
 import { Portrait } from './Portrait'
+import { targetGroups } from './targets'
 
 /**
  * Logging a turn, all in one place: pick a target, Hit or Miss, damage, Log. "End turn" sits beside "Log"
@@ -24,12 +25,7 @@ export function LogPanel({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const foes = (c: CombatantView) => (attacker.side === 'ENEMY' ? c.side === 'PARTY' : c.side === 'ENEMY')
-  const candidates = view.combatants.filter((c) => c.id !== attacker.id && !c.defeated)
-  const groups: [string, CombatantView[]][] = [
-    [attacker.side === 'ENEMY' ? 'Party' : 'Enemies', candidates.filter(foes)],
-    [attacker.side === 'ENEMY' ? 'Enemies' : 'Allies', candidates.filter((c) => !foes(c))],
-  ]
+  const groups = targetGroups(attacker, view.combatants)
   const thisTurn = view.attacks.filter((a) => a.attackerId === attacker.id && a.round === view.round)
   const filledIn = targetId !== null && (!hit || damage !== '')
 
@@ -64,9 +60,7 @@ export function LogPanel({
     <div className="logp">
       <div className="k">Log attack · {attacker.name}</div>
       <div className="tlist" role="list" aria-label="Targets">
-        {groups
-          .filter(([, list]) => list.length)
-          .map(([heading, list]) => (
+        {groups.map(([heading, list]) => (
             <div key={heading} role="presentation">
               <div className="tgroup">{heading}</div>
               {list.map((c) => (

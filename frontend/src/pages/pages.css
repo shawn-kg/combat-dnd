@@ -265,3 +265,12 @@ label.prep-row {
     padding: 10px;
   }
 }
+.prep-row.npc {
+  border-left: 3px solid var(--npc);
+}
+/* NPC portraits outside the tracker: purple, like their tracker rows. */
+.npc-row .mini,
+.prep-row.npc .mini {
+  border-color: var(--npc);
+  background: var(--npc-bg);
+}
