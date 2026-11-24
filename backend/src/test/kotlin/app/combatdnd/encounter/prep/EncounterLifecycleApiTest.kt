@@ -180,6 +180,53 @@ class EncounterLifecycleApiTest(@Autowired private val env: Environment, @Autowi
     }
 
     @Test
+    fun `NPCs are the DM's alone to manage, in the fight with their stats hidden or shown, and their HP carries over`() {
+        val t = Table()
+        // Only the DM manages NPCs, and players don't get the list (NPCs can be secret).
+        assertEquals(403, t.player.post("/api/campaigns/${t.id}/npcs", """{"name":"Spy","ac":12,"maxHp":10}""").statusCode())
+        val mira = t.dm.ok("POST", "/api/campaigns/${t.id}/npcs", """{"name":"Mira","ac":14,"maxHp":24,"hp":20}""")!!.get("id").asString()
+        val spy = t.dm.ok("POST", "/api/campaigns/${t.id}/npcs", """{"name":"Spy","ac":12,"maxHp":10}""")!!.get("id").asString()
+        assertEquals(listOf("Mira", "Spy"), t.dm.read("/api/campaigns/${t.id}").get("npcs").toList().map { it.get("name").asString() })
+        assertEquals(0, t.player.read("/api/campaigns/${t.id}").get("npcs").size())
+        assertEquals(400, t.dm.call("PUT", "/api/campaigns/${t.id}/npcs/$spy", """{"name":"Spy","ac":12,"maxHp":10,"hp":11}""").statusCode())
+
+        // Mira is in this fight; the spy isn't. NPCs are opt-in.
+        val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Escort"}""")!!.get("id").asString()
+        assertTrue(t.dm.read("/api/encounters/$enc/prep").get("npcs").none { it.get("included").asBoolean() })
+        t.dm.ok("PUT", "/api/encounters/$enc/prep", """{"name":"Escort","npcs":[{"npcId":"$mira"}],"enemies":[{"templateId":"${t.goblin}","count":1}]}""")
+        val prep = t.dm.read("/api/encounters/$enc/prep").get("npcs")
+        assertEquals(listOf(true, false), listOf(mira, spy).map { id -> prep.first { it.get("npcId").asString() == id }.get("included").asBoolean() })
+        t.dm.ok("POST", "/api/encounters/$enc/start")
+
+        val dmView = t.dm.read("/api/encounters/$enc/state")
+        assertEquals(setOf("Lyra", "Bram", "Mira", "Goblin"), dmView.get("combatants").toList().map { it.get("name").asString() }.toSet())
+        assertEquals("NPC", dmView.combatant("Mira").get("side").asString())
+        assertEquals(20, dmView.combatant("Mira").get("hp").asInt())
+        // Players see Mira, but not her AC or HP...
+        val seen = t.player.read("/api/encounters/$enc/state").combatant("Mira")
+        assertTrue(seen.get("hp").isNull)
+        assertTrue(seen.get("ac").isNull)
+        // ...until the DM shows them. Players can't do that themselves.
+        val edit = """{"type":"EditCombatant","id":"$mira","statsVisible":true}"""
+        assertEquals(403, t.player.post("/api/encounters/$enc/commands", edit).statusCode())
+        t.dm.ok("POST", "/api/encounters/$enc/commands", edit)
+        assertEquals(20, t.player.read("/api/encounters/$enc/state").combatant("Mira").get("hp").asInt())
+
+        // The goblin wounds Mira; at the end of the fight her HP is saved.
+        val goblin = dmView.combatant("Goblin").get("id").asString()
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"SetInitiatives","initiatives":{"$goblin":20}}""")
+        t.dm.ok("POST", "/api/encounters/$enc/begin")
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"LogAttack","attackerId":"$goblin","targetId":"$mira","hit":true,"damage":6}""")
+        t.dm.ok("POST", "/api/encounters/$enc/end")
+        val npcs = t.dm.read("/api/campaigns/${t.id}").get("npcs").toList().associate { it.get("name").asString() to it.get("hp").asInt() }
+        assertEquals(mapOf("Mira" to 14, "Spy" to 10), npcs)
+
+        // Deleting an NPC removes it from saved encounters too.
+        t.dm.ok("DELETE", "/api/campaigns/${t.id}/npcs/$mira")
+        assertEquals(1, t.dm.read("/api/campaigns/${t.id}").get("npcs").size())
+    }
+
+    @Test
     fun `the DM deletes an encounter`() {
         val t = Table()
         val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Spare"}""")!!.get("id").asString()

@@ -12,6 +12,16 @@ data class PlayerRow(val id: UUID, val campaignId: UUID, val name: String, val s
 
 data class TemplateRow(val id: UUID, val campaignId: UUID, val name: String, val portraitKey: String?, val ac: Int, val maxHp: Int)
 
+data class NpcRow(
+    val id: UUID,
+    val name: String,
+    val portraitKey: String?,
+    val ac: Int,
+    val maxHp: Int,
+    val hp: Int,
+    val statsVisible: Boolean,
+)
+
 data class CharacterRow(
     val id: UUID,
     val campaignId: UUID,
@@ -148,6 +158,35 @@ class CampaignRepository(private val jdbc: JdbcClient) {
     fun unassign(characterId: UUID) {
         jdbc.sql("update character set player_id = null where id = ?").param(characterId).update()
     }
+
+    // ---------- NPCs ----------
+
+    private val npcCols = "id, name, portrait_key, ac, max_hp, current_hp, stats_visible"
+
+    fun npcs(campaignId: UUID): List<NpcRow> =
+        jdbc.sql("select $npcCols from npc where campaign_id = ? order by name").param(campaignId).query(::npcRow).list()
+
+    fun npc(campaignId: UUID, id: UUID): NpcRow? =
+        jdbc.sql("select $npcCols from npc where campaign_id = ? and id = ?").params(campaignId, id).query(::npcRow).optional().orElse(null)
+
+    fun createNpc(campaignId: UUID, name: String, portraitKey: String?, ac: Int, maxHp: Int, hp: Int, statsVisible: Boolean): UUID =
+        jdbc.sql(
+            "insert into npc (campaign_id, name, portrait_key, ac, max_hp, current_hp, stats_visible) values (?, ?, ?, ?, ?, ?, ?) returning id",
+        ).params(listOf(campaignId, name, portraitKey, ac, maxHp, hp, statsVisible)).query(UUID::class.java).single()
+
+    fun updateNpc(id: UUID, name: String, portraitKey: String?, ac: Int, maxHp: Int, hp: Int, statsVisible: Boolean) {
+        jdbc.sql("update npc set name = ?, portrait_key = ?, ac = ?, max_hp = ?, current_hp = ?, stats_visible = ? where id = ?")
+            .params(listOf(name, portraitKey, ac, maxHp, hp, statsVisible, id)).update()
+    }
+
+    fun deleteNpc(id: UUID) {
+        jdbc.sql("delete from npc where id = ?").param(id).update()
+    }
+
+    private fun npcRow(rs: ResultSet, @Suppress("UNUSED_PARAMETER") n: Int) = NpcRow(
+        rs.getObject("id", UUID::class.java), rs.getString("name"), rs.getString("portrait_key"),
+        rs.getInt("ac"), rs.getInt("max_hp"), rs.getInt("current_hp"), rs.getBoolean("stats_visible"),
+    )
 
     // ---------- monster templates ----------
 

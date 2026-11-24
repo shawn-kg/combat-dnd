@@ -207,6 +207,26 @@ class DmEditingTest {
     }
 
     @Test
+    fun `players see an NPC's AC and HP only when the DM shows them, and only the DM can change that`() {
+        val mira = CombatantId("mira")
+        val s = ambush().run(Actor.Dm to Command.AddCombatant(Combatant(mira, "Mira", Side.NPC, Controller.Dm, 12, 14, 20, 24)))
+        fun seen(state: EncounterState, viewer: Actor) = viewFor(state, viewer).combatants.first { it.id == mira }
+        assertEquals(null, seen(s, lyraActor).hp)
+        assertEquals(null, seen(s, lyraActor).ac)
+        assertEquals(20, seen(s, Actor.Dm).hp)
+        assertIs<Decision.Rejected>(decide(s, Command.EditCombatant(mira, statsVisible = true), lyraActor))
+        val shown = s.run(Actor.Dm to Command.EditCombatant(mira, statsVisible = true))
+        assertEquals(20, seen(shown, lyraActor).hp)
+        assertEquals(14, seen(shown, lyraActor).ac)
+        assertEquals(24, seen(shown, lyraActor).maxHp)
+        // Players can attack a visible NPC, and it takes its own turn like anyone else.
+        assertIs<Decision.Accepted>(decide(shown, hit(LYRA, mira, 5), lyraActor))
+        assertEquals(15, shown.run(lyraActor to hit(LYRA, mira, 5)).combatant(mira).hp)
+        // A player can't sneak statsVisible in alongside an HP change to their own character.
+        assertIs<Decision.Rejected>(decide(s, Command.EditCombatant(LYRA, hp = 10, statsVisible = true), lyraActor))
+    }
+
+    @Test
     fun `nobody at 0 HP can attack, but they still take their turn, and healing lets them attack again`() {
         val down = ambush().run(Actor.Dm to Command.EditCombatant(LYRA, hp = 0))
         val r = decide(down, hit(LYRA, BOSS, 5), lyraActor)

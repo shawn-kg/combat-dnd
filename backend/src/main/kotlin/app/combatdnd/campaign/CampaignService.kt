@@ -68,7 +68,8 @@ class CampaignService(
         if (session.isDm(req, campaignId)) {
             val templates = repo.templates(campaignId).map { TemplateDto(it.id, it.name, it.portraitKey, it.ac, it.maxHp) }
             return CampaignView(c.id, c.name, "DM", c.joinCode, players.map(playerDto), characters.map(toDto), me = null, templates = templates,
-                encounters = encounters.campaignEncounters(campaignId), dmLinkMade = repo.hasDmLink(campaignId), dmDevices = repo.dmDeviceCount(campaignId))
+                encounters = encounters.campaignEncounters(campaignId), dmLinkMade = repo.hasDmLink(campaignId), dmDevices = repo.dmDeviceCount(campaignId),
+                npcs = repo.npcs(campaignId).map(::npcDto))
         }
         val me = session.player(req, campaignId) ?: throw session.notInCampaign(req, campaignId)
         if (me.status == PlayerStatus.REMOVED) throw NotSignedIn("The DM removed you from this campaign. Ask for the link again.")
@@ -221,6 +222,39 @@ class CampaignService(
         requireDm(req, campaignId)
         characterOr404(campaignId, id)
         repo.unassign(id)
+    }
+
+    // ---------- NPCs (DM only) ----------
+
+    private fun npcDto(n: NpcRow) = NpcDto(n.id, n.name, n.portraitKey, n.ac, n.hp, n.maxHp, n.statsVisible)
+
+    private fun validNpc(body: NpcRequest, hp: Int, campaignId: UUID): String {
+        checkPortrait(body.portraitKey, campaignId)
+        if (body.ac < 0) throw BadRequest("AC can't be negative.")
+        if (body.maxHp <= 0) throw BadRequest("Max HP must be above 0.")
+        if (hp !in 0..body.maxHp) throw BadRequest("HP must be between 0 and ${body.maxHp}.")
+        return body.name.trim().ifEmpty { throw BadRequest("Give the NPC a name.") }.take(60)
+    }
+
+    fun createNpc(req: HttpServletRequest, campaignId: UUID, body: NpcRequest): NpcDto {
+        requireDm(req, campaignId)
+        val hp = body.hp ?: body.maxHp
+        val name = validNpc(body, hp, campaignId)
+        val id = repo.createNpc(campaignId, name, body.portraitKey, body.ac, body.maxHp, hp, body.statsVisible)
+        return NpcDto(id, name, body.portraitKey, body.ac, hp, body.maxHp, body.statsVisible)
+    }
+
+    fun updateNpc(req: HttpServletRequest, campaignId: UUID, id: UUID, body: NpcRequest) {
+        requireDm(req, campaignId)
+        val existing = repo.npc(campaignId, id) ?: throw NotFound("No such NPC.")
+        val hp = body.hp ?: minOf(existing.hp, body.maxHp)
+        repo.updateNpc(id, validNpc(body, hp, campaignId), body.portraitKey, body.ac, body.maxHp, hp, body.statsVisible)
+    }
+
+    fun deleteNpc(req: HttpServletRequest, campaignId: UUID, id: UUID) {
+        requireDm(req, campaignId)
+        repo.npc(campaignId, id) ?: throw NotFound("No such NPC.")
+        repo.deleteNpc(id)
     }
 
     // ---------- monster templates (DM only) ----------
