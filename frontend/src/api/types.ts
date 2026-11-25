@@ -41,6 +41,16 @@ export interface CombatantView {
   /** NPCs: whether players see AC and HP. */
   statsVisible: boolean
   lastTurn: LastTurnView | null
+  /** This fight so far, counted as logged, from the attacks this viewer can see. */
+  totals: Totals
+}
+
+export interface Totals {
+  dealt: number
+  taken: number
+  hits: number
+  misses: number
+  biggestHit: number
 }
 
 /** PREPARING: the DM is setting it up. ROLLING_INITIATIVE: on the tracker, initiative going in. ACTIVE: turns running. ENDED: over. */

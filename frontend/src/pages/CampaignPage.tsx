@@ -5,6 +5,7 @@ import type { CampaignView, CharacterDto, EncounterSummary, NpcDto, TemplateDto 
 import type { EncounterStatus } from '../api/types'
 import { api, ApiError } from '../api/client'
 import { DndBeyondField, DndBeyondLink } from '../combat/DndBeyond'
+import { TranscriptLinks } from '../combat/FightSummary'
 import { applyHpEdit } from '../combat/hpEdit'
 import { Portrait } from '../combat/Portrait'
 import { PortraitPicker } from '../combat/PortraitPicker'
@@ -221,6 +222,7 @@ function Encounters({ c }: { c: CampaignView }) {
                 </>
               ) : (
                 <>
+                  {e.status !== 'PREPARING' && <TranscriptLinks encounterId={e.id} compact />}
                   <Link className="btn small" to={encounterLink(c.id, e)}>
                     {e.status === 'PREPARING' ? 'Set up' : e.status === 'ENDED' ? 'View' : 'Open'}
                   </Link>

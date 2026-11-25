@@ -13,6 +13,7 @@ import app.combatdnd.encounter.domain.EncounterView
 import app.combatdnd.encounter.domain.LastTurnView
 import app.combatdnd.encounter.domain.PlayerId
 import app.combatdnd.encounter.domain.Side
+import app.combatdnd.encounter.domain.Totals
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 
@@ -48,6 +49,7 @@ data class CombatantViewDto(
     /** NPCs: whether players see AC and HP. */
     val statsVisible: Boolean,
     val lastTurn: LastTurnDto?,
+    val totals: Totals,
 )
 
 data class LastTurnDto(val round: Int, val hits: Int, val misses: Int, val damage: Int, val attacks: List<AttackViewDto>)
@@ -66,7 +68,7 @@ fun EncounterView.toDto(h: Header) =
     EncounterViewDto(h.campaignId.toString(), h.name, h.status, viewerIsDm, round, currentId?.value, version, combatants.map { it.toDto() }, attacks.map { it.toDto() })
 
 private fun CombatantView.toDto() = CombatantViewDto(
-    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, runByPlayer, ac, hp, maxHp, hidden, defeated, statsVisible, lastTurn?.toDto(),
+    id.value, name, side, portraitKey, initiative, isCurrent, controlledByViewer, runByPlayer, ac, hp, maxHp, hidden, defeated, statsVisible, lastTurn?.toDto(), totals,
 )
 
 private fun LastTurnView.toDto() = LastTurnDto(round, hits, misses, damage, attacks.map { it.toDto() })

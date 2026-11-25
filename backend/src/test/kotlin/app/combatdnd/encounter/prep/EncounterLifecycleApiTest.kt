@@ -227,6 +227,37 @@ class EncounterLifecycleApiTest(@Autowired private val env: Environment, @Autowi
     }
 
     @Test
+    fun `the DM downloads a transcript, players can't, and there's none before the fight starts`() {
+        val t = Table()
+        val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Road ambush"}""")!!.get("id").asString()
+        t.dm.ok("PUT", "/api/encounters/$enc/prep", """{"name":"Road ambush","party":[{"characterId":"${t.bram}","included":false}],"enemies":[{"templateId":"${t.goblin}","count":1}]}""")
+        assertEquals(409, t.dm.call("GET", "/api/encounters/$enc/transcript").statusCode())
+        t.dm.ok("POST", "/api/encounters/$enc/start")
+        val goblin = t.dm.read("/api/encounters/$enc/state").combatant("Goblin").get("id").asString()
+        t.dm.ok("POST", "/api/encounters/$enc/commands", """{"type":"SetInitiatives","initiatives":{"${t.lyra}":15,"$goblin":10}}""")
+        t.dm.ok("POST", "/api/encounters/$enc/begin")
+        t.player.ok("POST", "/api/encounters/$enc/commands", """{"type":"LogAttack","attackerId":"${t.lyra}","targetId":"$goblin","hit":true,"damage":9}""")
+
+        // Totals on the tracker: as logged (9, though the goblin had 7).
+        val lyraRow = t.player.read("/api/encounters/$enc/state").combatant("Lyra")
+        assertEquals(9, lyraRow.get("totals").get("dealt").asInt())
+        assertEquals(9, t.dm.read("/api/encounters/$enc/state").combatant("Goblin").get("totals").get("taken").asInt())
+
+        assertEquals(403, t.player.call("GET", "/api/encounters/$enc/transcript").statusCode())
+        val md = t.dm.call("GET", "/api/encounters/$enc/transcript?format=md")
+        assertEquals(200, md.statusCode(), md.body())
+        assertTrue(md.headers().firstValue("Content-Disposition").get().contains("Road-ambush-transcript.md"))
+        assertTrue(md.body().contains("Lyra → Goblin: hit, 9 damage (Goblin 0/7)"), md.body())
+        assertTrue(md.body().contains("in progress (so far)"), md.body())
+        val csv = t.dm.call("GET", "/api/encounters/$enc/transcript?format=csv")
+        assertEquals(listOf("round,attacker,target,result,damage,target_hp_after,target_max_hp,corrected", "1,Lyra,Goblin,hit,9,0,7,no"), csv.body().trim().lines())
+        assertEquals(400, t.dm.call("GET", "/api/encounters/$enc/transcript?format=pdf").statusCode())
+
+        t.dm.ok("POST", "/api/encounters/$enc/end")
+        assertTrue(t.dm.call("GET", "/api/encounters/$enc/transcript").body().contains(" · over"))
+    }
+
+    @Test
     fun `the DM deletes an encounter`() {
         val t = Table()
         val enc = t.dm.ok("POST", "/api/campaigns/${t.id}/encounters", """{"name":"Spare"}""")!!.get("id").asString()

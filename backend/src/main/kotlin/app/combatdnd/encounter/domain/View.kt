@@ -29,7 +29,30 @@ data class CombatantView(
     val defeated: Boolean,
     val statsVisible: Boolean,
     val lastTurn: LastTurnView?,
+    /** This fight so far, from the attacks this viewer can see. */
+    val totals: Totals,
 )
+
+/**
+ * Damage counts as logged: a 12-damage hit on a 7 HP goblin is 12 dealt and 12 taken, even though HP stops at 0.
+ * Misses count as attacks with no damage.
+ */
+data class Totals(val dealt: Int, val taken: Int, val hits: Int, val misses: Int, val biggestHit: Int) {
+    companion object {
+        val NONE = Totals(0, 0, 0, 0, 0)
+
+        fun of(id: CombatantId, attacks: List<AttackEntry>): Totals {
+            val made = attacks.filter { it.attackerId == id }
+            return Totals(
+                dealt = made.sumOf { it.damage },
+                taken = attacks.filter { it.targetId == id }.sumOf { it.damage },
+                hits = made.count { it.hit },
+                misses = made.count { !it.hit },
+                biggestHit = made.filter { it.hit }.maxOfOrNull { it.damage } ?: 0,
+            )
+        }
+    }
+}
 
 /** The row's last-turn line, e.g. "Hit Goblin 2 · 9" or "2 hits, 1 miss · 17". */
 data class LastTurnView(val round: Int, val hits: Int, val misses: Int, val damage: Int, val attacks: List<AttackView>)
@@ -54,6 +77,9 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
         targetName = state.combatants[a.targetId]?.takeIf { visible(it.id) }?.name,
         hit = a.hit, damage = a.damage,
     )
+
+    // Totals come only from attacks this viewer may see, so they can't reveal what a hidden combatant did.
+    val seenAttacks = state.attacks.filter { !it.deleted && visible(it.attackerId) }
 
     val combatants = state.order
         .map(state::combatant)
@@ -84,6 +110,7 @@ fun viewFor(state: EncounterState, viewer: Actor): EncounterView {
                         attacks = entries.map(::attackView),
                     )
                 },
+                totals = Totals.of(c.id, seenAttacks),
             )
         }
 
