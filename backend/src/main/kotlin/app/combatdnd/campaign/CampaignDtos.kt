@@ -22,6 +22,9 @@ data class CharacterRequest(
 
 data class HpRequest(val hp: Int)
 
+/** A D&D Beyond character link, or null to remove it. */
+data class DndBeyondRequest(val url: String? = null)
+
 data class NpcRequest(
     val name: String,
     val ac: Int,
@@ -60,6 +63,8 @@ data class CharacterDto(
     val maxHp: Int,
     val playerId: UUID?,
     val playerName: String?,
+    /** Their D&D Beyond sheet, always in the form https://www.dndbeyond.com/characters/<id>. */
+    val dndBeyondUrl: String? = null,
 )
 
 data class NpcDto(

@@ -138,6 +138,11 @@ class CampaignController(private val service: CampaignService, private val limit
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun claim(@PathVariable id: UUID, @PathVariable characterId: UUID, req: HttpServletRequest) = service.claim(req, id, characterId)
 
+    /** The DM, or the player who owns the character: link (or unlink) its D&D Beyond sheet. */
+    @PatchMapping("/campaigns/{id}/characters/{characterId}/dndbeyond")
+    fun setDndBeyond(@PathVariable id: UUID, @PathVariable characterId: UUID, @RequestBody body: DndBeyondRequest, req: HttpServletRequest) =
+        service.setDndBeyondUrl(req, id, characterId, body.url)
+
     @PatchMapping("/campaigns/{id}/characters/{characterId}/hp")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun setHp(@PathVariable id: UUID, @PathVariable characterId: UUID, @RequestBody body: HpRequest, req: HttpServletRequest) =
