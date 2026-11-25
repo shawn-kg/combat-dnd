@@ -38,7 +38,8 @@ class TranscriptWriterTest {
     fun `Markdown has rounds, a summary, and names can't turn into formatting`() {
         val md = TranscriptWriter.markdown(t, TranscriptInfo("Road ambush", "Tuesday Group", EncounterStatus.ENDED, LocalDate.of(2026, 11, 25)))
         assertTrue(md.startsWith("# Road ambush: fight transcript\n\nTuesday Group · 2026-11-25 · 1 round · over\n"), md)
-        assertTrue(md.contains("## Round 1"), md)
+        assertTrue(md.contains("## Round 1\n\n- Initiative order: "), md) // not indented: it isn't part of a turn
+        assertTrue(md.contains("- **=HYPERLINK(\"x\")’s turn**\n  - "), md)
         assertTrue(md.contains("  - =HYPERLINK(\"x\") → Grim, the \\*Bold\\*: hit, 4 damage (Grim, the \\*Bold\\* 5/9)"), md)
         assertTrue(md.contains("| Combatant | Side | Dealt | Taken | Hits | Misses | Biggest hit | HP at end |"), md)
         assertTrue(md.contains("Most damage dealt: **=HYPERLINK(\"x\")** (4)."), md)

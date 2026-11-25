@@ -77,6 +77,12 @@ Everything the DM sets up is saved, so starting a fight takes seconds.
 2. During the fight the DM can add enemies or a party member who arrives late (with their saved HP, run by their player), reveal hidden ones, remove or mark defeated, and edit any field inline.
 3. **End combat** writes the party's HP back to their characters and closes the fight for everyone. Players get a Join the fight banner on the campaign page once a fight starts.
 
+### Damage totals, the summary and transcripts
+
+- **Fight totals:** each row shows "Fight: dealt 34 · taken 12". Damage counts as logged (a 12-damage hit on a 7 HP goblin counts 12 both ways). Players' totals only count attacks they can see, so they can't reveal a hidden combatant.
+- **Summary:** when the fight ends, everyone sees a table: dealt, taken, hits, misses, biggest hit, and how each combatant ended (players still see "—" for enemy HP).
+- **Transcript (DM only):** download from the tracker, the summary, or next to the encounter on the campaign page. Markdown (round by round, with HP at each moment, then the summary) or CSV (one row per attack). The server builds it by replaying the fight's events, so corrections and HP changes are in the record; undone actions aren't. CSV cells are guarded against spreadsheet formulas.
+
 ### Logging a turn
 
 On their turn, a player presses **Log attack** on their row:

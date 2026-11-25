@@ -2,6 +2,7 @@ import { parseInitiative } from './initiative'
 import { charactersNotInFight } from './partyMembers'
 import { targetGroups } from './targets'
 import { isDndBeyondLink } from './dndbeyond'
+import { summaryRows, totalsLine } from './fightStats'
 import { describe, expect, it } from 'vitest'
 import type { AttackView, CombatantView, LastTurnView } from '../api/types'
 import { applyHpEdit, numberedNames } from './hpEdit'
@@ -107,5 +108,18 @@ describe('isDndBeyondLink', () => {
     for (const bad of [null, undefined, '', 'https://www.dndbeyond.com/characters/', 'https://www.dndbeyond.com/characters/12/x',
       'https://www.dndbeyond.com.evil.example/characters/1', 'javascript:alert(1)', 'https://evil.example/characters/1'])
       expect(isDndBeyondLink(bad)).toBe(false)
+  })
+})
+
+describe('fight totals', () => {
+  const t = (dealt: number, taken: number, hits = 0, misses = 0) => ({ dealt, taken, hits, misses, biggestHit: 0 })
+  it('says nothing until something happened, then dealt and taken', () => {
+    expect(totalsLine(t(0, 0))).toBeNull()
+    expect(totalsLine(t(0, 0, 0, 1))).toBe('Fight: dealt 0 · taken 0')
+    expect(totalsLine(t(34, 12))).toBe('Fight: dealt 34 · taken 12')
+  })
+  it('orders the summary by damage dealt, then taken, then name', () => {
+    const c = (name: string, dealt: number, taken: number) => ({ id: name, name, totals: t(dealt, taken) }) as unknown as CombatantView
+    expect(summaryRows([c('Bram', 5, 0), c('Lyra', 34, 3), c('Abe', 5, 0), c('Gob', 5, 9)]).map((x) => x.name)).toEqual(['Lyra', 'Gob', 'Abe', 'Bram'])
   })
 })

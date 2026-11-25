@@ -22,14 +22,17 @@ object TranscriptWriter {
         appendLine(when_.joinToString(" · "))
 
         var round = -1
+        var inTurn = false // lines before the round's first turn (like the starting order) aren't under a turn
         for (line in t.lines) {
             if (line.round != round && line.round > 0) {
                 round = line.round
+                inTurn = false
                 appendLine()
                 appendLine("## Round $round")
                 appendLine()
             }
-            appendLine(if (line.turn) "- **${md(line.text)}**" else "  - ${md(line.text)}")
+            if (line.turn) inTurn = true
+            appendLine(if (line.turn) "- **${md(line.text)}**" else if (inTurn) "  - ${md(line.text)}" else "- ${md(line.text)}")
         }
 
         // Summary: every combatant still in the fight, by damage dealt.
