@@ -169,6 +169,36 @@ class CampaignApiTest(
     }
 
     @Test
+    fun `D&D Beyond links - players link their own sheet, the DM any, and only real character links`() {
+        val t = Table()
+        val (sam, _) = t.approvedPlayer("Sam")
+        sam.post("/api/campaigns/${t.id}/characters/${t.lyra}/claim")
+        fun link(b: Browser, character: String, url: String?) =
+            b.call("PATCH", "/api/campaigns/${t.id}/characters/$character/dndbeyond", if (url == null) "{}" else """{"url":"$url"}""")
+        fun linkOf(character: String) = t.dm.read("/api/campaigns/${t.id}").get("characters").first { it.get("id").asString() == character }.get("dndBeyondUrl")
+
+        // Sam links Lyra's sheet; it's tidied to the standard form, and everyone in the campaign sees it.
+        val r = link(sam, t.lyra, "dndbeyond.com/characters/987654321/builder")
+        assertEquals(200, r.statusCode(), r.body())
+        assertEquals("https://www.dndbeyond.com/characters/987654321", linkOf(t.lyra).asString())
+        assertEquals("https://www.dndbeyond.com/characters/987654321",
+            sam.read("/api/campaigns/${t.id}").get("characters").first { it.get("id").asString() == t.lyra }.get("dndBeyondUrl").asString())
+
+        // Not someone else's character, and nothing but a D&D Beyond character page.
+        assertEquals(403, link(sam, t.bram, "https://www.dndbeyond.com/characters/1").statusCode())
+        val bad = link(sam, t.lyra, "https://evil.example/characters/987654321")
+        assertEquals(400, bad.statusCode())
+        assertTrue(bad.body().contains("isn't a D&D Beyond character link"))
+        assertEquals(401, Browser().call("PATCH", "/api/campaigns/${t.id}/characters/${t.lyra}/dndbeyond", "{}").statusCode())
+
+        // The DM can set anyone's, and anyone allowed can remove it.
+        assertEquals(200, link(t.dm, t.bram, "https://www.dndbeyond.com/characters/555").statusCode())
+        assertEquals("https://www.dndbeyond.com/characters/555", linkOf(t.bram).asString())
+        assertEquals(200, link(sam, t.lyra, null).statusCode())
+        assertTrue(linkOf(t.lyra).isNull)
+    }
+
+    @Test
     fun `the tracker signs people in by cookie`() {
         val t = Table()
         val (sam, samId) = t.approvedPlayer("Sam")

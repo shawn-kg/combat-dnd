@@ -470,6 +470,10 @@
   margin-top: 8px;
 }
 
+.narrow-only {
+  display: none;
+}
+
 .dm-buttons {
   display: inline-flex;
   flex-wrap: wrap;
@@ -483,6 +487,9 @@
 @media (max-width: 520px) {
   .wide-only {
     display: none;
+  }
+  .narrow-only {
+    display: inline;
   }
   .tracker {
     gap: 8px;
@@ -610,4 +617,34 @@
 .npc .portrait {
   border-color: var(--npc);
   background: var(--npc-bg);
+}
+
+/* ---------- D&D Beyond ---------- */
+.ddb-link {
+  color: var(--gold);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ddb-link:hover {
+  text-decoration: underline;
+}
+.row-ddb {
+  font-size: 11px;
+}
+.tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tip > span {
+  flex: 1;
+}
+.tip-close {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
 }

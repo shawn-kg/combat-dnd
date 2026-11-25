@@ -1,6 +1,7 @@
 import { parseInitiative } from './initiative'
 import { charactersNotInFight } from './partyMembers'
 import { targetGroups } from './targets'
+import { isDndBeyondLink } from './dndbeyond'
 import { describe, expect, it } from 'vitest'
 import type { AttackView, CombatantView, LastTurnView } from '../api/types'
 import { applyHpEdit, numberedNames } from './hpEdit'
@@ -82,7 +83,7 @@ describe('parseInitiative', () => {
 })
 
 describe('charactersNotInFight', () => {
-  const ch = (id: string, name: string) => ({ id, name, portraitKey: null, ac: 15, hp: 20, maxHp: 20, playerId: null, playerName: null })
+  const ch = (id: string, name: string) => ({ id, name, portraitKey: null, ac: 15, hp: 20, maxHp: 20, playerId: null, playerName: null, dndBeyondUrl: null })
   it('offers only characters whose id is not already a combatant', () => {
     const view = { combatants: [{ id: 'lyra' }, { id: 'goblin-1' }] } as unknown as Parameters<typeof charactersNotInFight>[1]
     expect(charactersNotInFight([ch('lyra', 'Lyra'), ch('bram', 'Bram')], view).map((c) => c.name)).toEqual(['Bram'])
@@ -97,5 +98,14 @@ describe('targetGroups', () => {
     expect(names(targetGroups(all[0], all))).toEqual(['Enemies: gob', 'NPCs: mira', 'Party: bram'])
     expect(names(targetGroups(all[2], all))).toEqual(['Party: lyra,bram', 'NPCs: mira'])
     expect(names(targetGroups(all[4], all))).toEqual(['Enemies: gob', 'Party: lyra,bram'])
+  })
+})
+
+describe('isDndBeyondLink', () => {
+  it('only makes links of the exact form the server stores', () => {
+    expect(isDndBeyondLink('https://www.dndbeyond.com/characters/123456')).toBe(true)
+    for (const bad of [null, undefined, '', 'https://www.dndbeyond.com/characters/', 'https://www.dndbeyond.com/characters/12/x',
+      'https://www.dndbeyond.com.evil.example/characters/1', 'javascript:alert(1)', 'https://evil.example/characters/1'])
+      expect(isDndBeyondLink(bad)).toBe(false)
   })
 })

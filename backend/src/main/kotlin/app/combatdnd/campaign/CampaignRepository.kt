@@ -31,6 +31,7 @@ data class CharacterRow(
     val ac: Int,
     val maxHp: Int,
     val hp: Int,
+    val dndBeyondUrl: String? = null,
 )
 
 @Repository
@@ -121,7 +122,7 @@ class CampaignRepository(private val jdbc: JdbcClient) {
 
     // ---------- characters ----------
 
-    private val characterCols = "id, campaign_id, player_id, name, portrait_key, ac, max_hp, current_hp"
+    private val characterCols = "id, campaign_id, player_id, name, portrait_key, ac, max_hp, current_hp, dndbeyond_url"
 
     fun characters(campaignId: UUID): List<CharacterRow> =
         jdbc.sql("select $characterCols from character where campaign_id = ? order by name").param(campaignId).query(::characterRow).list()
@@ -145,6 +146,10 @@ class CampaignRepository(private val jdbc: JdbcClient) {
 
     fun setHp(id: UUID, hp: Int) {
         jdbc.sql("update character set current_hp = ? where id = ?").params(hp, id).update()
+    }
+
+    fun setDndBeyondUrl(id: UUID, url: String?) {
+        jdbc.sql("update character set dndbeyond_url = ? where id = ?").params(listOf(url, id)).update()
     }
 
     fun deleteCharacter(id: UUID) {
@@ -225,5 +230,6 @@ class CampaignRepository(private val jdbc: JdbcClient) {
         ac = rs.getInt("ac"),
         maxHp = rs.getInt("max_hp"),
         hp = rs.getInt("current_hp"),
+        dndBeyondUrl = rs.getString("dndbeyond_url"),
     )
 }

@@ -61,7 +61,7 @@ class CampaignService(
         val players = repo.players(campaignId)
         val names = players.associate { it.id to it.name }
         val characters = repo.characters(campaignId)
-        val toDto = { ch: CharacterRow -> CharacterDto(ch.id, ch.name, ch.portraitKey, ch.ac, ch.hp, ch.maxHp, ch.playerId, ch.playerId?.let(names::get)) }
+        val toDto = { ch: CharacterRow -> CharacterDto(ch.id, ch.name, ch.portraitKey, ch.ac, ch.hp, ch.maxHp, ch.playerId, ch.playerId?.let(names::get), ch.dndBeyondUrl) }
         val claimed = characters.filter { it.playerId != null }.associate { it.playerId!! to it.id }
         val playerDto = { p: PlayerRow -> PlayerDto(p.id, p.name, p.status, claimed[p.id]) }
 
@@ -294,13 +294,29 @@ class CampaignService(
         if (!repo.claim(id, me.id)) throw Conflict("Someone else just chose that character. Pick another.")
     }
 
+    /** The DM may change any character; a player only their own. */
+    private fun requireDmOrOwner(req: HttpServletRequest, campaignId: UUID, ch: CharacterRow, what: String) {
+        if (session.isDm(req, campaignId)) return
+        val me = approvedPlayer(req, campaignId)
+        if (ch.playerId != me.id) throw Forbidden("You can only change your own character's $what.")
+    }
+
+    /** Links the character's D&D Beyond sheet (or removes the link). Only D&D Beyond character pages are accepted. */
+    fun setDndBeyondUrl(req: HttpServletRequest, campaignId: UUID, id: UUID, url: String?): CharacterDto {
+        val ch = characterOr404(campaignId, id)
+        requireDmOrOwner(req, campaignId, ch, "D&D Beyond link")
+        val clean = url?.takeIf { it.isNotBlank() }?.let {
+            dndBeyondCharacterUrl(it)
+                ?: throw BadRequest("That isn't a D&D Beyond character link. It looks like https://www.dndbeyond.com/characters/123456789.")
+        }
+        repo.setDndBeyondUrl(id, clean)
+        return CharacterDto(ch.id, ch.name, ch.portraitKey, ch.ac, ch.hp, ch.maxHp, ch.playerId, null, clean)
+    }
+
     /** The DM, or the player who owns the character, sets its current HP. */
     fun setHp(req: HttpServletRequest, campaignId: UUID, id: UUID, hp: Int) {
         val ch = characterOr404(campaignId, id)
-        if (!session.isDm(req, campaignId)) {
-            val me = approvedPlayer(req, campaignId)
-            if (ch.playerId != me.id) throw Forbidden("You can only change your own character's HP.")
-        }
+        requireDmOrOwner(req, campaignId, ch, "HP")
         if (hp !in 0..ch.maxHp) throw BadRequest("HP must be between 0 and ${ch.maxHp}.")
         repo.setHp(id, hp)
     }
