@@ -1,20 +1,17 @@
 # Combat D&D, explained
 
-A guided tour of the whole system, from the database up to the screen and out to the servers it runs on.
-Read the chapters in order. Each one uses real excerpts from this repository, with a few small
-**Try this** exercises to run on your own machine (`./scripts/dev.sh` running).
+An interactive guide to the whole system, from the database up to the screen and out to the servers it
+runs on. It's a set of HTML pages (GitHub shows them as source, not as pages):
 
-| # | Chapter | What you'll understand |
-| --- | --- | --- |
-| 0 | [The big picture](00-big-picture.md) | The pieces, where they run, the folder map, one click followed end to end, and reading a fight back as a transcript |
-| 1 | Data: Postgres and migrations | Every table, how the schema changes safely, why secrets are hashed |
-| 2 | The core: event sourcing | `decide`, `evolve`, `viewFor`, and why undo and testing are easy |
-| 3 | The backend: Spring Boot layers | Controllers, services, repositories, transactions, locks, caches, 409s |
-| 4 | Real-time: Server-Sent Events | How every screen updates, heartbeats, reconnects, why one server |
-| 5 | Security | Cookie sign-in, hashed tokens, CSRF, rate limits, input checking |
-| 6 | The frontend: React and TypeScript | Vite, routing, TanStack Query, `useEncounter`, components, CSS |
-| 7 | Building and testing | Gradle, npm, the three kinds of tests, linting, the dev script |
-| 8 | Infrastructure | Docker, Render, Neon, secrets, CI and deploys, backups, cold starts |
-| 9 | Thinking like a systems engineer | The trade-offs, what breaks first at scale, and what's missing |
+- **Open locally:** open `docs/guide/index.html` in your browser (double-click it, or
+  `explorer.exe docs/guide/index.html` from WSL).
+- **Or read the published copy** at the private link in the PR or chat where it was shared.
 
-Chapters appear here as they're written.
+| File | What it is |
+| --- | --- |
+| `index.html` | Contents and reading progress |
+| `00-big-picture.html` | Chapter 0: the pieces, the folder map, one click end to end, the transcript flow |
+| `guide.css`, `guide.js` | Shared look and behaviour (theme, glossary tooltips, code blocks, checklists, quizzes) |
+
+Chapters are added as they're written. Code excerpts are copied from `main`; when the code changes,
+update the matching chapter in the same pull request.
