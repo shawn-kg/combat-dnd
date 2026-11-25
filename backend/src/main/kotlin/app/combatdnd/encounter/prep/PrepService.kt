@@ -11,6 +11,7 @@ import app.combatdnd.encounter.domain.CombatantId
 import app.combatdnd.encounter.domain.Controller
 import app.combatdnd.encounter.domain.PlayerId
 import app.combatdnd.encounter.domain.Side
+import app.combatdnd.encounter.domain.transcript
 import app.combatdnd.web.BadRequest
 import app.combatdnd.web.Conflict
 import app.combatdnd.web.Forbidden
@@ -144,6 +145,26 @@ class PrepService(
             }
         }
         return service.start(encounterId, Actor.Dm, party + npcs + enemies)
+    }
+
+    data class Download(val filename: String, val contentType: String, val body: String)
+
+    /** DM only: the fight so far (or the whole fight, once over), as Markdown or CSV. */
+    fun transcript(req: HttpServletRequest, encounterId: UUID, format: String): Download {
+        val campaignId = dmOf(req, encounterId)
+        val meta = encounters.meta(encounterId)!!
+        if (meta.status == EncounterStatus.PREPARING) throw Conflict("This fight hasn't started, so there's nothing to export yet.")
+        val t = transcript(encounters.events(encounterId))
+        val base = meta.name.replace(Regex("[^A-Za-z0-9 _-]"), "").trim().replace(' ', '-').ifEmpty { "fight" }.take(60)
+        return when (format) {
+            "csv" -> Download("$base-attacks.csv", "text/csv; charset=utf-8", TranscriptWriter.csv(t))
+            "md" -> {
+                val playedOn = encounters.firstEventAt(encounterId)?.atZone(java.time.ZoneOffset.UTC)?.toLocalDate()
+                val info = TranscriptInfo(meta.name, campaigns.campaign(campaignId)!!.name, meta.status, playedOn)
+                Download("$base-transcript.md", "text/markdown; charset=utf-8", TranscriptWriter.markdown(t, info))
+            }
+            else -> throw BadRequest("Ask for format=md or format=csv.")
+        }
     }
 
     fun begin(req: HttpServletRequest, encounterId: UUID): Long {

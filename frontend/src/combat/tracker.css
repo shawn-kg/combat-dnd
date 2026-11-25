@@ -648,3 +648,69 @@
   font-size: 14px;
   padding: 0 2px;
 }
+
+/* ---------- fight totals, summary, transcript ---------- */
+.fight-totals {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.transcript-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+table.summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.summary th,
+table.summary td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+table.summary thead th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+table.summary .n {
+  text-align: right;
+}
+table.summary tbody th {
+  font-weight: 600;
+}
+table.summary .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+table.summary tr.party .mini {
+  border: 2px solid var(--party);
+}
+table.summary tr.enemy .mini {
+  border: 2px solid var(--enemy);
+}
+table.summary tr.npc .mini {
+  border: 2px solid var(--npc);
+}
+@media (max-width: 520px) {
+  .row .last .fight-totals {
+    flex-basis: 100%;
+  }
+  table.summary {
+    font-size: 12px;
+  }
+  table.summary th,
+  table.summary td {
+    padding: 5px 6px;
+  }
+}

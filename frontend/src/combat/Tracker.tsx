@@ -9,6 +9,8 @@ import { AddPartyMember } from './AddPartyMember'
 import { DndBeyondLink } from './DndBeyond'
 import { Editable } from './Editable'
 import { applyHpEdit } from './hpEdit'
+import { totalsLine } from './fightStats'
+import { TranscriptLinks } from './FightSummary'
 import { describeAttack, totalLine } from './lastTurn'
 import { LogPanel } from './LogPanel'
 import { Portrait } from './Portrait'
@@ -33,12 +35,14 @@ export type Act = (command: Command) => Promise<boolean>
 
 /** The initiative tracker: one row per combatant, in initiative order. The DM gets editing and controls. */
 export function Tracker({
+  encounterId,
   view,
   connected,
   send,
   undo,
   end,
 }: {
+  encounterId: string
   view: EncounterView
   connected: boolean
   send: (command: Command) => Promise<SendResult>
@@ -194,6 +198,7 @@ export function Tracker({
 
       {dm && end && !ending && (
         <div className="lrow end-row">
+          <TranscriptLinks encounterId={encounterId} compact />
           <span className="spacer" />
           <button type="button" className="btn small danger" onClick={() => setEnding(true)}>
             End combat…
@@ -302,7 +307,7 @@ function TrackerRow({
           )}
         </span>
         <Hp c={c} dm={dm} canEditHp={dm || c.controlledByViewer} edit={edit} />
-        <span className={`last${c.lastTurn ? '' : ' none'}`}>
+        <span className={`last${c.lastTurn || totalsLine(c.totals) ? '' : ' none'}`}>
           {c.lastTurn ? (
             <>
               <span className="round-tag">Round {c.lastTurn.round}</span>
@@ -314,8 +319,9 @@ function TrackerRow({
               {totalLine(c.lastTurn) && <span className="total">{totalLine(c.lastTurn)}</span>}
             </>
           ) : (
-            <span className="muted">—</span>
+            !totalsLine(c.totals) && <span className="muted">—</span>
           )}
+          {totalsLine(c.totals) && <span className="fight-totals">{totalsLine(c.totals)}</span>}
         </span>
         {dm && (
           <button type="button" className="menu-btn" aria-expanded={menuOpen} aria-label={`Actions for ${c.name}`} onClick={onMenu}>

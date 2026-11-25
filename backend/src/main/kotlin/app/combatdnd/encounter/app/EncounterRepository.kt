@@ -63,6 +63,11 @@ class EncounterRepository(private val jdbc: JdbcClient, private val codec: Event
             .query { rs, _ -> codec.decode(rs.getString("type"), rs.getString("payload")) }
             .list()
 
+    /** When the fight's first event was recorded (undone ones included: they still happened then). */
+    fun firstEventAt(encounterId: UUID): java.time.Instant? =
+        jdbc.sql("select min(created_at) from encounter_event where encounter_id = ?").param(encounterId)
+            .query(java.sql.Timestamp::class.java).optional().orElse(null)?.toInstant()
+
     fun append(encounterId: UUID, batch: Long, actor: Actor, events: List<Event>) {
         val next = jdbc.sql("select coalesce(max(seq), 0) + 1 from encounter_event where encounter_id = ?")
             .param(encounterId).query(Long::class.java).single()

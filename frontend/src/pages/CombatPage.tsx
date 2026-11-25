@@ -1,4 +1,5 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { FightSummary } from '../combat/FightSummary'
 import { Initiative } from '../combat/Initiative'
 import { PlayerInitiative } from '../combat/PlayerInitiative'
 import { Tracker } from '../combat/Tracker'
@@ -58,6 +59,7 @@ export function CombatPage() {
           <b>{view.name} is over</b>
           It lasted {view.round} {view.round === 1 ? 'round' : 'rounds'}. Everyone’s HP has been saved to their character for next time.
         </div>
+        <FightSummary view={view} encounterId={encounterId} />
       </main>
     )
   }
@@ -77,7 +79,7 @@ export function CombatPage() {
 
   return (
     <main className="page">
-      <Tracker view={view} connected={connected} send={send} undo={undo} end={end} />
+      <Tracker encounterId={encounterId} view={view} connected={connected} send={send} undo={undo} end={end} />
     </main>
   )
 }
