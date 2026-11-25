@@ -1,8 +1,12 @@
+import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { CampaignView } from '../api/campaign'
+import { api } from '../api/client'
 import type { CombatantView, Command, EncounterView } from '../api/types'
 import { AddEnemy } from './AddEnemy'
 import { AddNpc } from './AddNpc'
 import { AddPartyMember } from './AddPartyMember'
+import { DndBeyondLink } from './DndBeyond'
 import { Editable } from './Editable'
 import { applyHpEdit } from './hpEdit'
 import { describeAttack, totalLine } from './lastTurn'
@@ -49,6 +53,14 @@ export function Tracker({
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef<number | undefined>(undefined)
   const dm = view.viewerIsDm
+  // D&D Beyond links live on the characters (party combatants share their character's id). Quietly
+  // none if the campaign can't be loaded (e.g. the dev encounter opened with ?as=).
+  const links = useQuery({
+    queryKey: ['campaign', view.campaignId],
+    queryFn: () => api<CampaignView>('GET', `/campaigns/${view.campaignId}`),
+    retry: false,
+    select: (c) => new Map(c.characters.map((ch) => [ch.id, ch.dndBeyondUrl])),
+  }).data
 
   const show = useCallback((message: string) => {
     setNotice(message)
@@ -126,6 +138,7 @@ export function Tracker({
         )}
       </div>
 
+      {!dm && <DndBeyondTip />}
       {notice && (
         <div className="notice" role="alert">
           {notice}
@@ -166,6 +179,7 @@ export function Tracker({
             c={c}
             dm={dm}
             act={act}
+            dndBeyondUrl={c.side === 'PARTY' ? links?.get(c.id) : null}
             menuOpen={menuFor === c.id}
             onMenu={() => setMenuFor(menuFor === c.id ? null : c.id)}
             onLog={() => {
@@ -218,11 +232,13 @@ function TrackerRow({
   menuOpen,
   onMenu,
   onLog,
+  dndBeyondUrl,
   children,
 }: {
   c: CombatantView
   dm: boolean
   act: Act
+  dndBeyondUrl?: string | null
   menuOpen: boolean
   onMenu: () => void
   onLog: () => void
@@ -258,6 +274,10 @@ function TrackerRow({
             {c.isCurrent && <span className="tag turn">{c.controlledByViewer ? 'Your turn' : 'Turn'}</span>}
             {c.hidden && <span className="tag">Hidden</span>}
             {c.defeated && <span className="tag">Defeated</span>}
+            <DndBeyondLink url={dndBeyondUrl} className="row-ddb">
+              <span className="wide-only">D&amp;D Beyond</span>
+              <span className="narrow-only">Sheet</span>
+            </DndBeyondLink>
             {runsThisTurn && !children && (
               <>
                 {down ? (
@@ -381,5 +401,42 @@ function Hp({
         <i className={level} style={{ width: `${pct}%` }} />
       </span>
     </span>
+  )
+}
+
+const TIP_KEY = 'cdnd-tip-dndbeyond'
+
+/** Players: a one-time tip for keeping the tracker beside D&D Beyond. The ✕ hides it for good on this browser. */
+function DndBeyondTip() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(TIP_KEY) === 'hidden'
+    } catch {
+      return false
+    }
+  })
+  if (hidden) return null
+  return (
+    <div className="notice ok tip" role="note">
+      <span>
+        <b>Tip:</b> keep this beside D&amp;D Beyond<span className="wide-only"> (⧉ Pop out)</span>. When your HP changes there, click your
+        HP here to match.
+      </span>
+      <button
+        type="button"
+        className="tip-close"
+        aria-label="Hide this tip"
+        onClick={() => {
+          setHidden(true)
+          try {
+            localStorage.setItem(TIP_KEY, 'hidden')
+          } catch {
+            // Storage blocked: it stays hidden until the page reloads.
+          }
+        }}
+      >
+        ✕
+      </button>
+    </div>
   )
 }

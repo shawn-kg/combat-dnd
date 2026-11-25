@@ -20,6 +20,8 @@ export interface CharacterDto {
   maxHp: number
   playerId: string | null
   playerName: string | null
+  /** Their D&D Beyond sheet, always https://www.dndbeyond.com/characters/<id>. */
+  dndBeyondUrl: string | null
 }
 
 /** The DM's other people: neither party nor monsters. HP carries over like a character's. */

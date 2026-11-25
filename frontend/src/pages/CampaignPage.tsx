@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { CampaignView, CharacterDto, EncounterSummary, NpcDto, TemplateDto } from '../api/campaign'
 import type { EncounterStatus } from '../api/types'
 import { api, ApiError } from '../api/client'
+import { DndBeyondField, DndBeyondLink } from '../combat/DndBeyond'
 import { applyHpEdit } from '../combat/hpEdit'
 import { Portrait } from '../combat/Portrait'
 import { PortraitPicker } from '../combat/PortraitPicker'
@@ -437,6 +438,7 @@ function Characters({ c }: { c: CampaignView }) {
               <button type="button" className="btn small" onClick={() => setEditing(null)}>
                 Cancel
               </button>
+              <DndBeyondField campaignId={c.id} ch={ch} />
             </form>
           ) : (
             <div key={ch.id} className="list-row">
@@ -450,6 +452,7 @@ function Characters({ c }: { c: CampaignView }) {
                 AC {ch.ac} · {ch.hp}/{ch.maxHp} HP
               </span>
               <span className="small">{ch.playerName ? `Played by ${ch.playerName}` : <span className="muted">Not claimed yet</span>}</span>
+              <DndBeyondLink url={ch.dndBeyondUrl} className="small" />
               <span className="spacer" />
               {deleting === ch.id ? (
                 <>
@@ -798,6 +801,7 @@ function PlayerView({ c }: { c: CampaignView }) {
                   AC {ch.ac} · {ch.hp}/{ch.maxHp} HP
                 </span>
                 <span className="small muted">{ch.playerName ?? 'Not claimed yet'}</span>
+                <DndBeyondLink url={ch.dndBeyondUrl} className="small" />
               </div>
             ))}
         </div>
@@ -889,6 +893,11 @@ function MyCharacter({ c, ch }: { c: CampaignView; ch: CharacterDto }) {
         </form>
       </div>
       {setHp.error && <div className="err">{(setHp.error as ApiError).message}</div>}
+      <p className="muted small">
+        Paste your D&amp;D Beyond character link so you and the DM can open your sheet from the tracker. The sheet’s sharing must allow
+        it to be viewed.
+      </p>
+      <DndBeyondField campaignId={c.id} ch={ch} />
     </section>
   )
 }

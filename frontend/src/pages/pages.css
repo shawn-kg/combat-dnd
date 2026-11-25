@@ -274,3 +274,6 @@ label.prep-row {
   border-color: var(--npc);
   background: var(--npc-bg);
 }
+.list-row .ddb-field {
+  flex: 1 1 100%;
+}

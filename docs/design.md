@@ -62,6 +62,7 @@ Everything the DM sets up is saved, so starting a fight takes seconds.
 - **Party:** the characters persist between sessions. The DM adds characters (each shows "Not claimed yet" until a player picks it) and sets their portrait, AC and max HP. HP carries over from the last fight, and each player can set their own current HP at any time, between fights after a rest or during one, so the DM doesn't have to.
 - **Saved encounters:** the DM can keep several ready, for example "Goblin Ambush" and "Wolves at the Bridge". Each one lists which party members are in it (untick anyone who isn't playing tonight) and its enemies from templates, with a count and a hidden option ("Goblin × 2", "Goblin Archer × 1, hidden").
 - **NPCs:** the DM's other people, neither party nor monsters (a guide, a rival, a hireling). Saved per campaign with portrait, AC and HP, which carries over between fights like a character's. Each has a **Players see AC and HP** setting (off by default, changeable mid-fight from the ⋯ menu). Players never see the NPC list itself. NPCs are opt-in per encounter, can start hidden, and can be added mid-fight with **+ Add → NPC**. On the tracker they're purple, between the party's teal and the enemies' red, and the DM runs them.
+- **D&D Beyond links:** each character can link to its D&D Beyond sheet (set by the DM, or by the player for their own). Only D&D Beyond character pages are accepted, stored as `https://www.dndbeyond.com/characters/<id>`. The tracker shows a **D&D Beyond ↗** link on party rows (**Sheet ↗** in the compact layout) that opens the sheet in a new tab. Nothing is ever fetched from D&D Beyond: it has no public API, and its terms restrict automated access. Players also get a one-time tip in the tracker about keeping it beside D&D Beyond and matching their HP.
 - Changes save automatically. Nothing needs to be re-entered at the table.
 
 ### Starting combat
@@ -97,7 +98,7 @@ Postgres holds everything except image files, which go to object storage. A figh
 | `campaign` | name, join_code, dm_link_hash | One per group; `dm_link_hash` is the DM sign-in link's hash |
 | `dm_device` | campaign_id, token_hash | One per browser signed in as the DM |
 | `player` | campaign_id, display_name, token_hash, status (PENDING, APPROVED, REMOVED) | No passwords |
-| `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp | Created by the DM; a player claims one; HP carries over |
+| `character` | campaign_id, player_id (null until claimed), name, portrait_key, ac, max_hp, current_hp, dndbeyond_url | Created by the DM; a player claims one; HP carries over |
 | `npc` | campaign_id, name, portrait_key, ac, max_hp, current_hp, stats_visible | The DM's other people; HP carries over |
 | `monster_template` | campaign_id, name, portrait_key, ac, max_hp | Reused across encounters |
 | `encounter` | name, status (PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED), version, locked_batch | `version` guards against conflicting edits; undo never goes back past `locked_batch` (the roster from Start combat) |
