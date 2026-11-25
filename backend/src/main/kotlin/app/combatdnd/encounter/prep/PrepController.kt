@@ -2,7 +2,11 @@ package app.combatdnd.encounter.prep
 
 import app.combatdnd.encounter.api.VersionResponse
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -43,6 +47,17 @@ class PrepController(private val service: PrepService) {
     /** ROLLING_INITIATIVE -> ACTIVE: round 1, the top of the order goes first. */
     @PostMapping("/encounters/{id}/begin")
     fun begin(@PathVariable id: UUID, req: HttpServletRequest) = VersionResponse(service.begin(req, id))
+
+    /** DM only: download the fight's transcript, `format=md` (readable) or `format=csv` (one row per attack). */
+    @GetMapping("/encounters/{id}/transcript")
+    fun transcript(@PathVariable id: UUID, @RequestParam(defaultValue = "md") format: String, req: HttpServletRequest): ResponseEntity<String> {
+        val d = service.transcript(req, id, format)
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(d.filename).build().toString())
+            .header(HttpHeaders.CONTENT_TYPE, d.contentType)
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(d.body)
+    }
 
     /** -> ENDED, saving the party's HP to their characters. */
     @PostMapping("/encounters/{id}/end")
