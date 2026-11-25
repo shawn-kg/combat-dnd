@@ -6,7 +6,7 @@ Read the chapters in order. Each one uses real excerpts from this repository, wi
 
 | # | Chapter | What you'll understand |
 | --- | --- | --- |
-| 0 | [The big picture](00-big-picture.md) | The pieces, where they run, the folder map, and one click followed end to end |
+| 0 | [The big picture](00-big-picture.md) | The pieces, where they run, the folder map, one click followed end to end, and reading a fight back as a transcript |
 | 1 | Data: Postgres and migrations | Every table, how the schema changes safely, why secrets are hashed |
 | 2 | The core: event sourcing | `decide`, `evolve`, `viewFor`, and why undo and testing are easy |
 | 3 | The backend: Spring Boot layers | Controllers, services, repositories, transactions, locks, caches, 409s |

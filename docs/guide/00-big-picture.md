@@ -61,11 +61,13 @@ combat-dnd/
 │       │   ├── CombatDndApplication.kt   Starts the app (and reads DATABASE_URL)
 │       │   ├── encounter/                FIGHTS: the heart of the app
 │       │   │   ├── domain/   Pure rules, no database or web: Model, Commands, Events,
-│       │   │   │             Decide (is it allowed?), Evolve (what changes?), View (who sees what)
+│       │   │   │             Decide (is it allowed?), Evolve (what changes?), View (who sees what,
+│       │   │   │             including damage totals), Transcript (replays a fight into a story)
 │       │   │   ├── app/      EncounterService (locks, cache, undo), EncounterRepository (SQL),
 │       │   │   │             EventCodec (events ⇄ JSON), EncounterHub (live streams)
 │       │   │   ├── api/      EncounterController (HTTP endpoints) and the JSON shapes (DTOs)
-│       │   │   └── prep/     Setting fights up: roster, start, begin, end
+│       │   │   └── prep/     Setting fights up (roster, start, begin, end) and the transcript
+│       │   │                 download (TranscriptWriter: Markdown and CSV)
 │       │   ├── campaign/     Campaigns, players, joining, characters, NPCs, monsters, D&D Beyond links
 │       │   ├── auth/         Who is asking: cookies (Session) and ActorResolver
 │       │   ├── portrait/     Uploading, shrinking and serving portraits
@@ -81,7 +83,8 @@ combat-dnd/
 │       ├── main.tsx, App.tsx        Start-up and the list of pages (routes)
 │       ├── api/                     Talking to the server: client.ts, and types mirroring the DTOs
 │       ├── pages/                   One file per page: Home, Join, Campaign, Prep, Combat, DM sign-in
-│       ├── combat/                  The tracker: useEncounter (live state), Tracker, LogPanel, …
+│       ├── combat/                  The tracker: useEncounter (live state), Tracker, LogPanel,
+│       │                            FightSummary (end-of-fight table and transcript links), …
 │       └── styles/                  Colors (tokens.css) and shared controls (ui.css)
 ├── docs/                            Design doc, deploy guide, session checklist, this guide
 ├── scripts/dev.sh                   One command to run everything locally
@@ -263,6 +266,21 @@ minus hidden enemies, with enemy AC and HP replaced by nothing. So a player's br
 an enemy's HP, not even hidden in the page. Each viewer gets the *whole* tracker (a few KB), not a
 "diff", so a browser can never get out of step: any message fully replaces what it had.
 
+`viewFor` also works out each row's **damage totals** ("Fight: dealt 12 · taken 5"), and it only counts
+attacks *this viewer* is allowed to see:
+
+```kotlin
+// domain/View.kt
+// Totals come only from attacks this viewer may see, so they can't reveal what a hidden combatant did.
+val seenAttacks = state.attacks.filter { !it.deleted && visible(it.attackerId) }
+// …
+totals = Totals.of(c.id, seenAttacks),
+```
+
+That's a privacy rule that's easy to get wrong if totals were computed anywhere else: a player whose
+character "took 8" when they only saw 5 damage logged would know an invisible enemy is in the room. Because
+the filter and the totals live in the same function, they can't disagree.
+
 Broadcasting happens *outside* the lock on purpose: one laptop on slow Wi-Fi shouldn't hold up everyone
 else's next command.
 
@@ -281,6 +299,8 @@ source.addEventListener('state', (e) => {
 `setView` hands the new data to React, which works out which parts of the page changed and updates
 just those. The boss's HP bar slides from 30 to 21, and Lyra's "last turn" shows *Hit Goblin Boss · 9*,
 on every screen, including Lyra's own: her browser learned the result the same way everyone else did.
+Her row's "Fight: dealt …" total goes up by 9 and the boss's "taken" total too, because they're part of the
+same snapshot.
 
 Meanwhile the POST from step 2 also returned `{"version": 42}`, so if Lyra's player immediately presses
 **End turn**, that command carries version 42 even if the stream message hasn't arrived yet.
@@ -295,7 +315,62 @@ Meanwhile the POST from step 2 also returned `{"version": 42}`, so if Lyra's pla
 | The server restarts mid-session (a deploy) | Streams close, browsers reconnect, the fight is rebuilt from its events. Nothing lost. |
 | Postgres is unreachable | The transaction fails → the command is refused; memory never moved ahead of the database |
 
-## 4. The ideas you'll meet in every chapter
+## 4. A second flow: reading the history back
+
+The click above **writes** to the system. Here is one that only **reads**, and shows why storing events
+pays off: the DM presses **↓ Transcript**.
+
+```mermaid
+sequenceDiagram
+  participant B as DM's browser
+  participant S as Spring app
+  participant D as Postgres
+  B->>S: GET /api/encounters/{id}/transcript?format=md (a plain link, cookie attached)
+  S->>S: is this the DM? (else 403) · has the fight started? (else 409)
+  S->>D: select every event of this fight, in order, except undone ones
+  D-->>S: CombatantAdded, …, TurnChanged, AttackLogged, AttackEdited, …
+  S->>S: transcript(events): replay them one by one, writing a line for each
+  S->>S: TranscriptWriter: Markdown (or CSV)
+  S-->>B: 200, Content-Disposition: attachment; filename="Road-ambush-transcript.md"
+```
+
+The interesting part is `domain/Transcript.kt`. It folds the events exactly the way the server rebuilds a
+fight after a restart, but at each step it looks at the state *before* and *after* the event and writes
+down what changed:
+
+```kotlin
+for (event in events) {
+    val before = state
+    val after = evolve(before, event)            // the same evolve the live tracker uses
+    when (event) {
+        is Event.AttackLogged -> {
+            val target = after.combatant(event.targetId)
+            line("${name(event.attackerId)} → ${target.name}: ${result(event.hit, event.damage)} (${target.name} ${hpOf(after, target.id)})")
+        }
+        is Event.AttackEdited -> line("Correction: … is now ${result(event.hit, event.damage)} …")
+        // … one branch per kind of event
+    }
+    state = after
+}
+```
+
+So the transcript can say "Goblin 1 0/7" *at that moment*, even though the database never stored the
+goblin's HP: it's recomputed by replaying history. If the fight had been stored only as current numbers
+(a `combatant` table with an `hp` column), this feature would be impossible without having logged
+everything separately. Chapter 2 is about this trade-off.
+
+Three small details worth noticing, each a pattern you'll see again:
+
+- **The download is a plain link** (`<a href=… download>`), not a `fetch`. A GET with the cookie attached
+  is all it needs, and the browser handles saving the file because of the `Content-Disposition` header.
+- **Permission is checked on the server.** Players don't see the link, but hiding a button isn't
+  security: if a player types the URL, the server answers 403.
+- **Output is treated as untrusted.** Names were typed by people, so the Markdown writer escapes
+  characters like `*` and `|`, and the CSV writer neutralises cells starting with `=`, `+`, `-` or `@`, so
+  a character named `=HYPERLINK(…)` can't run as a formula in Excel. That's called **CSV injection**
+  (Chapter 5).
+
+## 5. The ideas you'll meet in every chapter
 
 - **The server decides everything.** The browser asks and displays. Rules and privacy are enforced in
   one place, so a modified browser can't cheat.
@@ -332,6 +407,15 @@ Run `./scripts/dev.sh`, open the dev fight it prints as DM (`…?as=dm`) in one 
    ```
 
    Your attack is there as JSON. There is no "HP" column anywhere for fights: it's all computed.
+6. **Replay a fight.** Download the dev fight's transcript, which is built from those same rows:
+
+   ```bash
+   curl -s 'http://localhost:8080/api/encounters/00000000-0000-4000-8000-0000000000a1/transcript?format=md&as=dm'
+   ```
+
+   Then log another attack, edit it in the DM's Turn log, and run it again: the transcript shows the
+   attack and then a "Correction:" line, with HP as it was at each moment. Try `format=csv` too, and try
+   `as=player:00000000-0000-4000-8000-00000000017a` instead of `as=dm`: **403**.
 
 **Next:** Chapter 1, the data: every table, how migrations change the schema safely, and why the
 database never sees a password or a sign-in secret.
