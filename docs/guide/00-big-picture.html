@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Big Picture · Combat D&amp;D Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="guide.css">
+<style>
+  /* ---------- the system map ---------- */
+  .map { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .map { grid-template-columns: minmax(0, 1.1fr) 40px minmax(0, 1.5fr) 40px minmax(0, 1fr); align-items: stretch; } }
+  .zone { border: 1px dashed var(--border-strong); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .zone > .zl { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .node { text-align: left; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 12px; padding: 10px 12px; cursor: pointer; font: 15px/1.4 var(--text); }
+  .node b { font-family: var(--display); font-size: 16px; display: block; }
+  .node span { font-size: 13px; color: var(--muted); }
+  .node:hover, .node[aria-pressed='true'] { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+  .node.inner { margin-left: 14px; }
+  .people { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .who { display: grid; place-items: center; gap: 2px; font-size: 12px; color: var(--muted); }
+  .who i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 13px var(--display); font-style: normal; color: var(--ink); border: 2px solid var(--party); background: color-mix(in srgb, var(--party) 16%, var(--surface)); }
+  .who i.dm { border-color: var(--gold); background: var(--gold-soft); }
+  .arrow { display: grid; place-items: center; color: var(--gold); font-size: 22px; }
+  .arrow::before { content: '↓'; }
+  @media (min-width: 900px) { .arrow::before { content: '⇄'; } }
+  .gh { margin-top: 12px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(14em, 1fr)); }
+  .detail { margin-top: 14px; min-height: 92px; }
+
+  /* ---------- folder map ---------- */
+  .tree { font: 14px/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px 6px; max-height: 560px; overflow: auto; }
+  .tree ul { list-style: none; margin: 0; padding-left: 16px; }
+  .tree > ul { padding-left: 4px; }
+  .tree details > summary { cursor: pointer; list-style: none; padding: 2px 6px; border-radius: 6px; }
+  .tree details > summary::-webkit-details-marker { display: none; }
+  .tree details > summary::before { content: '▸ '; color: var(--muted); }
+  .tree details[open] > summary::before { content: '▾ '; }
+  .tree button { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px; display: inline-block; }
+  .tree summary:hover, .tree button:hover, .tree button:focus-visible, .tree summary:focus-visible { background: var(--gold-soft); }
+  .tree button[aria-pressed='true'] { background: var(--gold); color: var(--on-gold); }
+  .tree .dir { color: var(--gold); font-weight: 600; }
+  .fileinfo h3 { font-family: var(--mono); font-size: 16px; overflow-wrap: anywhere; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--muted); margin-right: 6px; }
+
+  /* ---------- the request lane (stepper) ---------- */
+  .lane { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; position: relative; margin: 6px 0 14px; }
+  .st { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 10px 6px; text-align: center; font-size: 13px; line-height: 1.25; color: var(--muted); transition: border-color 0.25s, box-shadow 0.25s, color 0.25s; position: relative; }
+  .st b { display: block; font: 600 14px var(--display); color: var(--ink); margin-bottom: 2px; }
+  .st .ico { font-size: 20px; display: block; margin-bottom: 2px; }
+  .st.past { border-color: color-mix(in srgb, var(--gold) 45%, var(--border)); }
+  .st.on { border-color: var(--gold); color: var(--ink); box-shadow: 0 0 0 3px var(--gold-soft), 0 6px 18px var(--gold-soft); }
+  .st.fail { border-color: var(--enemy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--enemy) 22%, transparent); color: var(--ink); }
+  .st.skip { opacity: 0.35; }
+  .st + .st::before { content: ''; position: absolute; left: -7px; top: 50%; width: 8px; height: 2px; background: var(--border-strong); }
+  @media (max-width: 700px) {
+    .lane { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .st + .st::before { display: none; }
+    .st .ico { display: none; }
+  }
+  .stepper .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .dots { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dots button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--raised); color: var(--ink); font: 600 13px var(--text); cursor: pointer; }
+  .dots button[aria-current='step'] { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .stepbody { display: grid; gap: 18px; }
+  @media (min-width: 980px) { .stepbody { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; } }
+  .stepbody h3 { font-size: 22px; }
+  .state { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr)); gap: 8px; margin: 12px 0; }
+  .state div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+  .state div b { display: block; font: 600 15px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+  .state div.changed { border-color: var(--gold); }
+  .state div.changed b { color: var(--gold); }
+  .wire { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font: 13px/1.6 var(--mono); white-space: pre; overflow-x: auto; margin: 0 0 16px; }
+
+  /* ---------- failure scenarios ---------- */
+  .scen { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .scen button { border: 1px solid var(--border-strong); background: var(--raised); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: 600 14px var(--text); cursor: pointer; min-height: 40px; }
+  .scen button[aria-pressed='true'] { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+
+  /* ---------- DM vs player ---------- */
+  .mini { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .mini li { display: grid; grid-template-columns: 26px 34px minmax(0, 1fr) 40px 64px; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--party); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .mini li.enemy { border-left-color: var(--enemy); }
+  .mini li.hidden { border-style: dashed; background: transparent; }
+  .mini li.cur { border-color: var(--gold); border-left-color: var(--gold); }
+  .mini .i { font-weight: 700; color: var(--muted); text-align: center; }
+  .mini .p { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--display); border: 2px solid var(--party); }
+  .mini li.enemy .p { border-color: var(--enemy); }
+  .mini .n { font: 600 15px var(--display); }
+  .mini .n small { display: block; font: 12px var(--text); color: var(--muted); }
+  .mini .v { font-weight: 700; text-align: center; }
+  .mini .v.no { color: var(--muted); }
+  .json { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font: 13px/1.55 var(--mono); white-space: pre; overflow-x: auto; margin: 0; }
+  .json .k { color: var(--muted); }
+  .json .nul { color: var(--enemy); font-weight: 600; }
+  .json .gone { color: var(--muted); font-style: italic; }
+
+  /* ---------- transcript ---------- */
+  .flow { counter-reset: f; list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px; }
+  .flow li { counter-increment: f; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .flow li::before { content: counter(f); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-soft); color: var(--gold); font: 700 14px var(--display); border: 1px solid var(--gold); }
+  .sample { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .sample h4 { font: 700 20px var(--display); margin: 0 0 4px; }
+  .sample h5 { font: 600 16px var(--display); margin: 12px 0 6px; }
+  .sample ul { margin: 0; padding-left: 20px; }
+  .sample ul ul { padding-left: 18px; color: var(--muted); }
+
+  /* ---------- ideas ---------- */
+  .ideas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(15em, 1fr)); }
+  .ideas .panel b { font-family: var(--display); font-size: 17px; display: block; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html">COMBAT D&amp;D</a>
+    <span class="crumb">Chapter 0 · The big picture</span>
+    <nav>
+      <a class="iconbtn hide-s" href="index.html">Contents</a>
+      <button class="iconbtn" data-theme-toggle type="button"></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ======================= 1. the map ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h1>The big picture</h1>
+    <p class="lead">Combat D&amp;D is a small but complete web system: a browser app, an API server, a database, live updates to every screen, sign-in without passwords, and automated builds, deploys and backups. This chapter is the map; every later chapter zooms into one part of it. Click any box.</p>
+
+    <div class="map" role="group" aria-label="System map">
+      <div class="zone">
+        <span class="zl">Each person’s browser</span>
+        <div class="people" aria-hidden="true">
+          <span class="who"><i class="dm">DM</i>DM</span><span class="who"><i>L</i>Lyra</span><span class="who"><i>B</i>Bram</span><span class="who"><i>T</i>Thorin</span>
+        </div>
+        <button class="node" data-n="browser"><b>React app</b><span>HTML, JavaScript and CSS, drawn in the browser</span></button>
+      </div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="zone">
+        <span class="zl">Render (free web service)</span>
+        <button class="node" data-n="proxy"><b>Render’s proxy</b><span>HTTPS, routing, health checks</span></button>
+        <button class="node inner" data-n="spring"><b>Our Docker container: Spring Boot</b><span>serves the React files · REST API · live streams</span></button>
+      </div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="zone">
+        <span class="zl">Neon (free Postgres)</span>
+        <button class="node" data-n="db"><b>Postgres 18</b><span>the source of truth</span></button>
+      </div>
+    </div>
+    <div class="gh">
+      <button class="node" data-n="github"><b>GitHub</b><span>the repository and pull requests</span></button>
+      <button class="node" data-n="ci"><b>GitHub Actions</b><span>tests on every push · nightly backup</span></button>
+      <button class="node" data-n="deploy"><b>Render deploys</b><span>builds and ships main after CI passes</span></button>
+    </div>
+    <div class="panel detail" id="mapDetail" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ======================= 2. three running things ======================= -->
+<section class="band">
+  <div class="wrap split">
+    <div class="read">
+      <h2>Only three things are running</h2>
+      <p><b>The browser app</b> draws the screens and talks to the server. It holds no important state of its own: everything it shows came from the server.</p>
+      <p><b>The server</b> is one Spring Boot process in one Docker container on Render. It serves the browser app’s files, answers the API, keeps a live connection open to every screen, and enforces every rule.</p>
+      <p><b>The database</b> is Postgres on Neon, the source of truth. If the server restarts, everything is rebuilt from it.</p>
+      <p>Everything else (GitHub Actions, Render’s build system, the backup job) only runs when something happens: a push, a merge, the nightly timer.</p>
+    </div>
+    <div>
+      <div class="note"><b>Worth noticing early.</b> The server serves the frontend itself. The React build is copied into the server’s jar, so the site and the API share one address (<code>combat-dnd.onrender.com</code>). No CORS setup, and cookies just work. The cost: changing the UI means redeploying the server. Chapter 8 shows how the Dockerfile does it.</div>
+      <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/web/SpaForwardController.kt" data-src="c-spa" data-hl="3-4">
+        <figcaption class="why"><b>Why this exists:</b> the React app owns addresses like <code>/combat/abc</code>. If you refresh there, the server must still answer with the app’s one HTML page, not a 404. This is what makes it a <dfn data-g="spa">single-page app</dfn>.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 3. folder map ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>The folder map</h2>
+    <p class="lead">Open folders and click a file to see what it does. The backend’s <code>encounter/</code> package shows the shape the whole app follows: layers, where each only talks to the one below it.</p>
+    <div class="split">
+      <div class="tree" id="tree" aria-label="Repository folders"></div>
+      <div>
+        <div class="panel fileinfo" id="fileInfo" aria-live="polite"></div>
+        <h3 style="margin-top: 20px">The layers in encounter/</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Layer</th><th>Folder</th><th>Knows about</th><th>Doesn’t know about</th></tr></thead>
+            <tbody>
+              <tr><td><b>API</b></td><td><code>encounter/api</code></td><td>HTTP, JSON</td><td>SQL, locks</td></tr>
+              <tr><td><b>Application</b></td><td><code>encounter/app</code></td><td>Transactions, locks, caching, live streams</td><td>HTTP</td></tr>
+              <tr><td><b>Domain</b></td><td><code>encounter/domain</code></td><td>The rules of the tracker</td><td>Databases, HTTP, Spring: it’s plain Kotlin</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted" style="margin-top: 10px">That last row is the most important design decision in the codebase. Chapter 2 is about it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 4. one click, end to end ======================= -->
+<section class="band stepper" id="click">
+  <div class="wrap">
+    <h2>One click, end to end</h2>
+    <p class="lead">Lyra’s player is on their turn. They pick the Goblin Boss, choose <b>Hit</b>, type <code>9</code> and press <b>Log</b>. Within about a second every screen at the table shows the boss lose 9 HP. Step through what happens in between with the buttons or your arrow keys.</p>
+    <div class="lane" id="lane"></div>
+    <div class="bar">
+      <button class="btn" id="prev" type="button">◀ Back</button>
+      <button class="btn primary" id="next" type="button">Next ▶</button>
+      <div class="dots" id="dots" role="tablist" aria-label="Steps"></div>
+    </div>
+    <div class="stepbody" id="stepBody" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ======================= 5. failures ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>What could go wrong, and what happens</h2>
+    <p class="lead">Pick a situation to see where it’s caught.</p>
+    <div class="scen" id="scen"></div>
+    <div class="lane" id="lane2" aria-hidden="true"></div>
+    <div class="panel" id="scenText" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ======================= 6. DM vs player ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Same fight, different screens</h2>
+    <p class="lead">In step 7 the server builds a separate snapshot for each viewer. Flip between them: a player’s browser never even receives an enemy’s HP or a hidden enemy.</p>
+    <div class="seg" role="group" aria-label="Viewer">
+      <button type="button" data-view="dm" aria-pressed="true">The DM receives</button>
+      <button type="button" data-view="pl" aria-pressed="false">Lyra’s player receives</button>
+    </div>
+    <div class="split" style="margin-top: 16px">
+      <ol class="mini" id="miniRows"></ol>
+      <pre class="json" id="miniJson" aria-label="The JSON this viewer receives"></pre>
+    </div>
+    <p class="small muted" style="margin-top: 12px">The totals follow the same rule: they only count attacks this viewer can see, so the hidden archer’s 3 damage on Lyra shows in the DM’s totals but not the player’s. Otherwise “taken 8” next to only 5 logged damage would give the archer away.</p>
+  </div>
+</section>
+
+<!-- ======================= 7. transcript ======================= -->
+<section class="band">
+  <div class="wrap split">
+    <div>
+      <h2>A second flow: reading the history back</h2>
+      <p>The click above <b>writes</b>. This one only <b>reads</b>, and shows why storing <dfn data-g="event">events</dfn> pays off: the DM presses <b>↓ Transcript</b>.</p>
+      <ol class="flow">
+        <li><span>The browser follows a plain link: <code>GET /api/encounters/{id}/transcript?format=md</code>, cookie attached.</span></li>
+        <li><span>The server checks it’s the DM (otherwise 403) and that the fight has started (otherwise 409).</span></li>
+        <li><span>It loads every event of the fight, in order, leaving out undone ones.</span></li>
+        <li><span><code>transcript(events)</code> replays them one by one with the same <code>evolve</code> the live tracker uses, writing a line for each.</span></li>
+        <li><span>It answers with <code>Content-Disposition: attachment</code>, so the browser saves a file.</span></li>
+      </ol>
+      <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/encounter/domain/Transcript.kt" data-src="c-transcript" data-hl="3,8">
+        <figcaption class="why"><b>The point:</b> the transcript can say “Goblin 1 0/7” at that moment, though HP was never stored. Replaying history recomputes it. With only current numbers in the database, this feature would be impossible.</figcaption>
+      </figure>
+    </div>
+    <div>
+      <div class="seg" role="group" aria-label="Transcript view">
+        <button type="button" data-tview="nice" aria-pressed="true">As read</button>
+        <button type="button" data-tview="raw" aria-pressed="false">Raw Markdown</button>
+      </div>
+      <div class="sample" id="tNice" style="margin-top: 12px">
+        <h4>Road ambush: fight transcript</h4>
+        <p class="small muted">Tuesday Group · 2026-11-25 · 1 round · over</p>
+        <h5>Round 1</h5>
+        <ul>
+          <li>Initiative order: Lyra 15 · Goblin 1 12 (enemy) · Goblin 2 8 (enemy)</li>
+          <li><b>Lyra’s turn</b><ul><li>Lyra → Goblin 1: hit, 12 damage (Goblin 1 0/7)</li><li>Lyra → Goblin 2: miss (Goblin 2 7/7)</li></ul></li>
+          <li><b>Goblin 2’s turn</b><ul><li>Goblin 2 → Lyra: hit, 5 damage (Lyra 22/27)</li></ul></li>
+        </ul>
+        <h5>Summary</h5>
+        <div class="scroll"><table><thead><tr><th>Combatant</th><th>Dealt</th><th>Taken</th><th>HP at end</th></tr></thead>
+        <tbody><tr><td>Lyra</td><td>12</td><td>5</td><td>22/27</td></tr><tr><td>Goblin 2</td><td>5</td><td>0</td><td>7/7</td></tr><tr><td>Goblin 1</td><td>0</td><td>12</td><td>0/7 (down)</td></tr></tbody></table></div>
+      </div>
+      <pre class="wire" id="tRaw" hidden></pre>
+      <div class="note"><b>Three patterns you’ll meet again.</b> The download is a plain link, not a fetch: the browser saves it because of the response header. Permission is checked on the server: hiding the button from players isn’t security. And output is treated as untrusted: names are escaped for Markdown, and CSV cells starting with <code>=</code> are neutralised against <dfn data-g="csv-injection">CSV injection</dfn>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 8. ideas ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>The ideas you’ll meet in every chapter</h2>
+    <div class="ideas">
+      <div class="panel"><b>The server decides everything</b>The browser asks and displays. Rules and privacy live in one place, so a modified browser can’t cheat.</div>
+      <div class="panel"><b>Events are the truth</b>Fights are stored as what happened, not as current numbers.</div>
+      <div class="panel"><b>Pure core, impure shell</b>The rules are <dfn data-g="pure">pure functions</dfn>, wrapped by layers that handle locks, SQL and HTTP.</div>
+      <div class="panel"><b>Full, filtered snapshots</b>Every viewer gets the whole tracker they’re allowed to see. Nothing to merge, nothing to drift.</div>
+      <div class="panel"><b>One server</b>The lock, cache and live streams live in one process’s memory. Simple, and the first thing to change if the app had to grow (Chapter 9).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 9. try this ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Try this</h2>
+    <p class="lead">Run <code>./scripts/dev.sh</code>. Open the dev fight it prints as the DM (<code>…?as=dm</code>) in one window and as a player (<code>…?as=player:…</code>) in another. Ticks are saved in this browser.</p>
+    <ul class="todo" data-store="ch0-try">
+      <li><label><input type="checkbox"> Watch the stream</label><p class="small muted">In the player window open DevTools → Network, click the <code>stream</code> request, then EventStream. Press Next turn as the DM and watch a <code>state</code> message arrive. Find an enemy: <code>"ac": null, "hp": null</code>. That’s <code>viewFor</code>.</p></li>
+      <li><label><input type="checkbox"> See a command</label><p class="small muted">In the DM window’s Network tab, log an attack and click the <code>commands</code> request. Look at the body (the command and <code>expectedVersion</code>) and the response (the new version).</p></li>
+      <li><label><input type="checkbox"> Cause a 409</label><p class="small muted">Send a command based on an old version. Then remove <code>"expectedVersion":1</code> and send it again: it works, and the DM window moves to the next turn by itself.</p>
+        <div class="cmd"><pre>curl -i -X POST 'http://localhost:8080/api/encounters/00000000-0000-4000-8000-0000000000a1/commands?as=dm' -H 'Content-Type: application/json' -H 'X-Requested-With: curl' -d '{"type":"NextTurn","expectedVersion":1}'</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Skip the CSRF header</label><p class="small muted">Run the same command without <code>-H 'X-Requested-With: curl'</code>. You get 403: the <dfn data-g="csrf">CSRF</dfn> guard.</p></li>
+      <li><label><input type="checkbox"> Read the event log</label><p class="small muted">Your attack is there as JSON. There’s no HP column for fights anywhere: it’s all computed.</p>
+        <div class="cmd"><pre>docker compose exec db psql -U combat combat_dnd -c "select seq, batch, actor_role, type, payload from encounter_event order by seq desc limit 5"</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Replay a fight</label><p class="small muted">Download the dev fight’s transcript. Log an attack, edit it in the Turn log, and download again: a “Correction:” line appears. Swap <code>as=dm</code> for <code>as=player:00000000-0000-4000-8000-00000000017a</code> to get 403.</p>
+        <div class="cmd"><pre>curl -s 'http://localhost:8080/api/encounters/00000000-0000-4000-8000-0000000000a1/transcript?format=md&amp;as=dm'</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================= 10. quick check ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Quick check</h2>
+    <div class="quiz">
+      <div class="q" data-answer="2"><p>Lyra’s player presses Log. When does their own screen show the boss at 21 HP?</p>
+        <div class="opts"><button>Immediately, before the request is sent</button><button>When the POST returns 200</button><button>When the live stream delivers the new snapshot, like everyone else’s</button></div>
+        <div class="explain" hidden><b></b>The browser never changes the tracker itself (no optimistic updates). The POST only returns the new version number; the picture comes from the stream.</div></div>
+      <div class="q" data-answer="1"><p>Where is the boss’s current HP stored?</p>
+        <div class="opts"><button>In an <code>hp</code> column on a combatant table</button><button>Nowhere: it’s computed by replaying the fight’s events</button><button>In the browser’s memory</button></div>
+        <div class="explain" hidden><b></b>The database holds the event log. The server keeps a computed copy in memory and can always rebuild it, which is also how the transcript knows HP at every moment.</div></div>
+      <div class="q" data-answer="0"><p>Why does the server send each viewer the whole tracker instead of just what changed?</p>
+        <div class="opts"><button>So a browser can never drift out of step: each message replaces everything</button><button>Because diffs are impossible over SSE</button><button>To make the messages smaller</button></div>
+        <div class="explain" hidden><b></b>A few KB per change is cheap, and a reconnect is just one more snapshot. Diffs would need careful ordering and recovery logic.</div></div>
+      <div class="q" data-answer="2"><p>A player edits the page’s JavaScript to show the transcript button. What happens when they press it?</p>
+        <div class="opts"><button>They download the transcript</button><button>They download it without hidden enemies</button><button>The server answers 403</button></div>
+        <div class="explain" hidden><b></b>Hiding a button is a convenience. The permission check happens on the server for every request.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap next">
+    <button class="btn" data-mark-read="ch0" type="button">Mark this chapter read</button>
+    <a class="btn primary" href="index.html">Contents · Chapter 1 next ▶</a>
+  </div>
+</section>
+</main>
+
+<footer class="band"><div class="wrap">Combat D&amp;D guide · Chapter 0 · Code excerpts are from <code>main</code>; follow “full file ↗” for context.</div></footer>
+
+<!-- ======================= code excerpts (plain text, no escaping needed) ======================= -->
+<script type="text/plain" id="c-spa">
+@Controller
+class SpaForwardController {
+    @GetMapping("/join/**", "/dm/**", "/c/**", "/combat/**")
+    fun forward(): String = "forward:/index.html"
+}
+</script>
+<script type="text/plain" id="c-transcript">
+for (event in events) {
+    val before = state
+    val after = evolve(before, event)            // the same evolve the live tracker uses
+    when (event) {
+        is Event.AttackLogged -> {
+            val target = after.combatant(event.targetId)
+            line("${name(event.attackerId)} → ${target.name}: ${result(event.hit, event.damage)} (${target.name} ${hpOf(after, target.id)})")
+        }
+        is Event.AttackEdited -> line("Correction: … is now ${result(event.hit, event.damage)} …")
+        // … one branch per kind of event
+    }
+    state = after
+}
+</script>
+<script type="text/plain" id="c-s1">
+const ok = await act({ type: 'LogAttack', attackerId: attacker.id, targetId, hit, damage: dmg })
+if (ok) {
+  setTargetId(null)
+  setDamage('')
+}
+</script>
+<script type="text/plain" id="c-s2">
+const send = useCallback((command: Command) => post('commands', { ...command, expectedVersion: version.current }), [post])
+// …
+const res = await fetch(`/api/encounters/${encounterId}/${path}${asParam}`, {
+  method: 'POST',
+  credentials: 'include',                                  // send the sign-in cookie
+  headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'combat-dnd' },
+  body: body ? JSON.stringify(body) : undefined,
+})
+</script>
+<script type="text/plain" id="c-s4">
+// web/WebConfig.kt: runs before any /api/** handler
+if (request.method in safe || !request.getHeader("X-Requested-With").isNullOrBlank()) return true
+response.status = HttpServletResponse.SC_FORBIDDEN
+
+// encounter/api/EncounterController.kt
+@PostMapping("/commands")
+fun command(@PathVariable id: UUID, @RequestBody body: CommandRequest, request: HttpServletRequest): VersionResponse =
+    VersionResponse(service.handle(id, actors.resolve(request, id), body.toCommand(), body.expectedVersion))
+</script>
+<script type="text/plain" id="c-s5">
+fun handle(id: UUID, actor: Actor, command: Command, expectedVersion: Long?): Long = publish(id) { loaded ->
+    requireRunning(loaded)
+    if (expectedVersion != null && expectedVersion != loaded.revision) throw StaleVersion()
+    commit(id, loaded, actor, decideOrThrow(loaded.state, command, actor))
+}
+
+// domain/Decide.kt: the rules for LogAttack
+!actor.controls(attacker) -> forbidden("That isn't your character.")
+!isDm && state.currentId != attacker.id -> forbidden("You can log attacks on your own turn.")
+!isDm && target.hidden -> invalid("Unknown target.")
+attacker.hp == 0 -> invalid("${attacker.name} is at 0 HP and can't attack. Heal them above 0 first.")
+else -> ok(Event.AttackLogged(id = state.nextAttackId(), round = state.round, attackerId = attacker.id, ...))
+</script>
+<script type="text/plain" id="c-s6">
+val revision = loaded.revision + 1
+val next = events.fold(loaded.state, ::evolve)   // apply the event: boss HP 30 → 21
+tx.executeWithoutResult {
+    if (events.isNotEmpty()) repo.append(id, batch = revision, actor = actor, events = events)
+    repo.setVersion(id, revision)
+}
+loaded.state = next                               // only after the database said yes
+loaded.revision = revision                        // 41 → 42
+</script>
+<script type="text/plain" id="c-s7">
+// encounter/app/EncounterHub.kt: after the lock is released
+fun broadcast(id: UUID, state: EncounterState, header: Header) {
+    subscribers[id]?.forEach { send(it, viewFor(state, it.actor).toDto(header)) }
+}
+
+// domain/View.kt: what may this viewer see?
+val seenAttacks = state.attacks.filter { !it.deleted && visible(it.attackerId) }
+val seesStats = isDm || c.side == Side.PARTY || (c.side == Side.NPC && c.statsVisible)
+hp = if (seesStats) c.hp else null,
+totals = Totals.of(c.id, seenAttacks),
+</script>
+<script type="text/plain" id="c-s8">
+source.addEventListener('state', (e) => {
+  const next: EncounterView = JSON.parse((e as MessageEvent<string>).data)
+  version.current = Math.max(version.current, next.version)
+  setView((prev) => (prev && prev.version > next.version ? prev : next))
+})
+</script>
+
+<script src="guide.js"></script>
+<script>
+{
+  const { esc, renderCode, bindGlossary } = window.Guide
+  const $ = (id) => document.getElementById(id)
+
+  /* ---------- system map ---------- */
+  const NODES = {
+    browser: ['The browser app', 'React, compiled to plain JavaScript by Vite. It draws every screen, sends commands, and listens to a live stream. It never decides anything: what it shows always came from the server.', 'Chapter 6'],
+    proxy: ['Render’s proxy', 'Holds the HTTPS certificate and decrypts requests (TLS termination), then forwards plain HTTP to our container on the port in the PORT variable. Adds X-Forwarded-Proto and X-Forwarded-For. Also runs the health check and wakes the free service when it’s asleep.', 'Chapter 8'],
+    spring: ['Spring Boot, in our Docker container', 'One Java 21 process with an embedded web server (Tomcat). Serves the React files, the REST API under /api, and one Server-Sent Events stream per open tracker. Keeps each fight in memory behind its own lock.', 'Chapters 3 and 4'],
+    db: ['Postgres on Neon', 'Campaigns, players, characters, NPCs, monsters, portraits, and every fight’s event log. Neon sleeps after 5 idle minutes and wakes in about a second. Talked to over TLS with JDBC, through a pool of at most 5 connections.', 'Chapter 1'],
+    github: ['GitHub', 'The code and its history. Every change arrives as a pull request on a branch, then is merged into main.', 'Chapter 7'],
+    ci: ['GitHub Actions', 'ci.yml runs on every push: backend tests against a real Postgres 18, frontend lint, tests and build, and a Docker image build. backup.yml runs nightly and keeps a pg_dump for 30 days.', 'Chapters 7 and 8'],
+    deploy: ['Render deploys', 'render.yaml tells Render to build the Dockerfile and deploy main, but only after CI passes (autoDeployTrigger: checksPass). Each deploy reports back to GitHub as a Deployment.', 'Chapter 8'],
+  }
+  const mapBtns = [...document.querySelectorAll('.node[data-n]')]
+  const showNode = (k) => {
+    mapBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.n === k)))
+    const [t, d, ch] = NODES[k]
+    $('mapDetail').innerHTML = `<h3>${esc(t)}</h3><p class="small" style="margin:0">${esc(d)}</p><p class="small muted" style="margin:6px 0 0">More in ${esc(ch)}.</p>`
+  }
+  mapBtns.forEach((b) => b.addEventListener('click', () => showNode(b.dataset.n)))
+  showNode('spring')
+
+  /* ---------- folder tree ---------- */
+  // [name, note, chapter, children?]. Paths are built from the names.
+  const TREE = ['combat-dnd', 'The repository.', '', [
+    ['backend', 'The server: Kotlin and Spring Boot, built with Gradle.', '3', [
+      ['build.gradle.kts', 'Dependencies (Spring Boot 4, Jackson 3, Flyway, Postgres driver) and build settings.', '7'],
+      ['src/main/kotlin/app/combatdnd', 'All server code, one folder per area.', '3', [
+        ['CombatDndApplication.kt', 'Starts Spring, and first turns a pasted postgresql:// DATABASE_URL into JDBC settings.', '8'],
+        ['encounter', 'Fights: the heart of the app.', '2', [
+          ['domain', 'Pure rules. No database, no HTTP, no Spring: Model, Commands, Events, Decide, Evolve, View, Transcript.', '2'],
+          ['app', 'EncounterService (per-fight lock, cache, undo), EncounterRepository (SQL), EventCodec (events ⇄ JSON), EncounterHub (live streams).', '3'],
+          ['api', 'EncounterController (HTTP endpoints) and the DTOs: the exact JSON shapes sent and received.', '3'],
+          ['prep', 'Setting fights up (roster, start, begin, end) and the transcript download (TranscriptWriter).', '3'],
+        ]],
+        ['campaign', 'Campaigns, joining, players, characters, NPCs, monsters, D&D Beyond links, the DM sign-in link.', '3'],
+        ['auth', 'Who is asking: Session reads the cookies; ActorResolver turns a request into the DM or a player.', '5'],
+        ['portrait', 'Uploading, cropping to 256×256 and serving portraits (stored in Postgres).', '3'],
+        ['web', 'Cross-cutting: errors become {"message"} JSON, the CSRF header check, forwarding app pages to index.html.', '5'],
+        ['dev', 'Sample campaign and goblin fight, only in development.', '7'],
+      ]],
+      ['src/main/resources', 'Settings and the database schema.', '1', [
+        ['application.yml', 'Database URL, port, connection pool, upload limits, health check.', '8'],
+        ['db/migration', 'V1 to V6: the schema, one change per file, applied in order by Flyway.', '1'],
+      ]],
+      ['src/test/kotlin', 'Rules tests (no database) and API tests (real HTTP, real Postgres).', '7'],
+    ]],
+    ['frontend', 'The browser app: React and TypeScript, built with Vite.', '6', [
+      ['index.html', 'The one HTML page. React draws everything inside it.', '6'],
+      ['src/main.tsx', 'Starts React with the router and the data cache (TanStack Query).', '6'],
+      ['src/App.tsx', 'The list of pages (routes), the top bar, the crash screen.', '6'],
+      ['src/api', 'client.ts (fetch with cookies and the CSRF header) and types mirroring the server’s DTOs.', '6'],
+      ['src/pages', 'One file per page: Home, Join, Campaign, Prep, Combat, DM sign-in.', '6'],
+      ['src/combat', 'The tracker: useEncounter (the live stream), Tracker, LogPanel, Initiative, FightSummary, …', '6'],
+      ['src/styles', 'tokens.css (every colour, dark and light) and ui.css (shared controls).', '6'],
+    ]],
+    ['docs', 'Design doc, deploy guide, session-day checklist, and this guide.', ''],
+    ['scripts/dev.sh', 'One command for everything locally: Postgres in Docker, the backend, the frontend.', '7'],
+    ['docker-compose.yml', 'The local Postgres for development.', '7'],
+    ['Dockerfile', 'How the production image is built: frontend → jar → small Java runtime.', '8'],
+    ['render.yaml', 'Render’s settings: free web service, Docker, deploy main after CI passes.', '8'],
+    ['.github/workflows', 'ci.yml (tests on every push) and backup.yml (nightly pg_dump).', '8'],
+  ]]
+  const BLOB = 'https://github.com/shawn-kg/combat-dnd/tree/main/'
+  const items = []
+  const build = ([name, note, ch, kids], path, depth) => {
+    const full = path === null ? '' : path ? `${path}/${name}` : name // the root itself has no path
+    const i = items.push({ name, note, ch, full }) - 1
+    const label = `<button type="button" data-i="${i}" class="${kids ? 'dir' : ''}">${esc(name)}${kids ? '/' : ''}</button>`
+    if (!kids) return `<li>${label}</li>`
+    const open = depth < 2 || name === 'src/main/kotlin/app/combatdnd' || name === 'encounter' ? ' open' : '' // open down to encounter/
+    return `<li><details${open}><summary>${label}</summary><ul>${kids.map((k) => build(k, full, depth + 1)).join('')}</ul></details></li>`
+  }
+  $('tree').innerHTML = `<ul>${build(TREE, null, 0)}</ul>`
+  const tbtns = [...$('tree').querySelectorAll('button[data-i]')]
+  const showItem = (i) => {
+    const it = items[i]
+    tbtns.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.i) === i)))
+    const link = it.full ? `<a href="${BLOB}${esc(it.full)}" target="_blank" rel="noopener">Open on GitHub ↗</a>` : ''
+    $('fileInfo').innerHTML = `<h3>${esc(it.full || it.name)}</h3><p style="margin:0 0 8px">${esc(it.note)}</p><p class="small" style="margin:0">${it.ch ? `<span class="chip">Chapter ${esc(it.ch)}</span>` : ''}${link}</p>`
+  }
+  tbtns.forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); showItem(Number(b.dataset.i)) }))
+  showItem(items.findIndex((x) => x.name === 'domain'))
+
+  /* ---------- the stepper ---------- */
+  const STATIONS = [['💻', 'Lyra’s browser', 'React'], ['🛡️', 'Render proxy', 'HTTPS ends'], ['🌱', 'Spring', 'checks, routing'], ['🔒', 'Lock & rules', 'decide'], ['🗄️', 'Postgres', 'one transaction'], ['📡', 'Streams', 'per-viewer'], ['🖥️', 'Every screen', 'React redraws']]
+  const lane = (el) => { el.innerHTML = STATIONS.map(([ico, b, s], i) => `<div class="st" data-s="${i}"><span class="ico" aria-hidden="true">${ico}</span><b>${esc(b)}</b>${esc(s)}</div>`).join('') }
+  lane($('lane')); lane($('lane2'))
+
+  const STEPS = [
+    { at: 0, title: 'The button sends a command', code: 'c-s1', file: 'frontend/src/combat/LogPanel.tsx', hl: '1',
+      text: '<p>LogPanel checks the form, then sends a <dfn data-g="command">command</dfn>: a small object describing what the person wants to happen.</p><p>Notice what it does <b>not</b> do: it doesn’t subtract 9 from the boss on screen. The browser never changes the tracker itself. It asks, and waits for the server to tell everyone the new truth. That’s called having <b>no optimistic updates</b>: a moment of delay in exchange for never showing something the server then refuses.</p>',
+      state: [['Boss HP (server)', '30/30'], ['Tracker version', '41'], ['Event log', 'unchanged']] },
+    { at: 0, title: 'The request leaves the browser', code: 'c-s2', file: 'frontend/src/combat/useEncounter.ts', hl: '1,5-6',
+      text: '<p>useEncounter turns the command into an HTTP POST. Three things ride along:</p><p><b>expectedVersion</b>: “the last version I saw”. If someone else changed the fight in the meantime, the server refuses with 409 instead of acting on stale information: <dfn data-g="optimistic">optimistic concurrency</dfn>.</p><p><b>The cookie</b> <code>cdnd_pl_&lt;campaign&gt;</code>: a random secret saying who this browser is.</p><p><b>X-Requested-With</b>: a header other websites can’t make your browser send, which blocks <dfn data-g="csrf">CSRF</dfn>.</p>',
+      wire: 'POST /api/encounters/9f2c…/commands HTTP/2\nhost: combat-dnd.onrender.com\ncontent-type: application/json\nx-requested-with: combat-dnd\ncookie: cdnd_pl_51b0…=k3J8…\n\n{"type":"LogAttack","attackerId":"lyra-id","targetId":"boss-id",\n "hit":true,"damage":9,"expectedVersion":41}',
+      state: [['Sent version', '41', 1], ['Boss HP (server)', '30/30'], ['Event log', 'unchanged']] },
+    { at: 1, title: 'Render’s proxy ends HTTPS', code: null,
+      text: '<p>The request reaches Render encrypted. Render’s proxy holds the certificate, decrypts it (<dfn data-g="tls">TLS termination</dfn>) and forwards plain HTTP to our container, on the port Render chose and passed in the <code>PORT</code> environment variable.</p><p>It adds headers our code relies on: <code>X-Forwarded-Proto: https</code> decides whether cookies are marked <code>Secure</code>, and <code>X-Forwarded-For</code> (the last entry, the one the proxy added) is who gets rate-limited when joining.</p>',
+      wire: 'POST /api/encounters/9f2c…/commands HTTP/1.1\nhost: combat-dnd.onrender.com\nx-forwarded-proto: https\nx-forwarded-for: 203.0.113.7\n…the same body…',
+      state: [['Encryption', 'ended at the proxy', 1], ['Our port', '$PORT'], ['Boss HP (server)', '30/30']] },
+    { at: 2, title: 'Spring checks it and finds the right method', code: 'c-s4', file: 'backend/src/main/kotlin/app/combatdnd/encounter/api/EncounterController.kt', hl: '2,6-8',
+      text: '<p>Spring Boot runs an embedded web server inside our process. Each request gets a cheap Java 21 <dfn data-g="virtual-threads">virtual thread</dfn>, so many open live streams don’t cost many operating-system threads.</p><p>An interceptor checks the CSRF header first. Then Spring matches the URL to <code>command(…)</code>, and Jackson turns the JSON into a Kotlin object, using <code>"type"</code> to pick the command class.</p><p><code>actors.resolve(…)</code> hashes the cookie and looks it up: the answer is an <b>Actor</b>, the DM or a player. From here on, nothing cares about cookies or HTTP.</p>',
+      state: [['CSRF header', 'present ✓', 1], ['Actor', 'Player(Lyra’s player)', 1], ['Command', 'LogAttack', 1]] },
+    { at: 3, title: 'The fight’s lock, the version check, the rules', code: 'c-s5', file: 'backend/src/main/kotlin/app/combatdnd/encounter/app/EncounterService.kt', hl: '3-4',
+      text: '<p><code>publish(id) { … }</code> takes a lock that belongs to this fight only: two commands for the same fight run one after the other, but different fights never wait for each other.</p><p><code>loaded</code> is the fight kept in memory. After a restart it’s rebuilt by replaying its events.</p><p><code>decide</code> is a <dfn data-g="pure">pure function</dfn>: is it Lyra’s turn, is she yours, is the target visible to you, is she above 0 HP? It answers with an <dfn data-g="event">event</dfn>, a fact in the past tense.</p>',
+      state: [['Version check', '41 = 41 ✓', 1], ['Decision', 'Accepted', 1], ['New event', 'AttackLogged(a17, lyra → boss, hit, 9)', 1]] },
+    { at: 4, title: 'One transaction in Postgres', code: 'c-s6', file: 'backend/src/main/kotlin/app/combatdnd/encounter/app/EncounterService.kt', hl: '3-6,7-8',
+      text: '<p>One <dfn data-g="transaction">transaction</dfn>: the event row is inserted <i>and</i> the fight’s version goes to 42, or neither happens. The event is stored as JSON in a <dfn data-g="jsonb">jsonb</dfn> column.</p><p>What’s <b>not</b> saved: the boss’s new HP. A fight’s state is always computed from its events. That’s <dfn data-g="event-sourcing">event sourcing</dfn>, and Chapter 2 explains why undo, history and testing get so simple.</p><p>Only after Postgres confirms does the in-memory copy move forward, so memory can never get ahead of the database.</p>',
+      wire: "insert into encounter_event (encounter_id, seq, batch, actor_role, actor_id, type, payload)\nvalues ('9f2c…', 58, 42, 'PLAYER', '…', 'AttackLogged',\n  '{\"id\":\"a17\",\"round\":3,\"attackerId\":\"lyra-id\",\"targetId\":\"boss-id\",\"hit\":true,\"damage\":9}');\nupdate encounter set version = 42 where id = '9f2c…';",
+      state: [['Tracker version', '41 → 42', 1], ['Boss HP (server)', '30 → 21', 1], ['Event log', '+1 row (seq 58)', 1]] },
+    { at: 5, title: 'Everyone gets their own snapshot', code: 'c-s7', file: 'backend/src/main/kotlin/app/combatdnd/encounter/domain/View.kt', hl: '3,7-10',
+      text: '<p>Every open tracker holds one long-lived request, a <dfn data-g="sse">Server-Sent Events</dfn> stream. After the lock is released, the hub sends each viewer their own version: <code>viewFor</code> gives the DM everything, and players the same list minus hidden enemies, with enemy AC and HP left out. A player’s browser never even receives an enemy’s HP.</p><p>Each viewer gets the whole tracker (a few KB), not a diff, so a browser can never drift out of step. And it happens outside the lock, so one slow laptop can’t hold up the next command.</p>',
+      state: [['DM receives', 'boss hp: 21', 1], ['Players receive', 'boss hp: null', 1], ['Lyra’s totals', 'dealt +9', 1]] },
+    { at: 6, title: 'Every screen redraws', code: 'c-s8', file: 'frontend/src/combat/useEncounter.ts', hl: '4',
+      text: '<p>Each browser’s stream listener receives the new snapshot and hands it to React, which updates just the parts that changed. The boss’s HP bar slides from 30 to 21 for the DM, Lyra’s last turn reads “Hit Goblin Boss · 9” and her “Fight: dealt” total goes up by 9, on every screen including Lyra’s own.</p><p>Meanwhile the POST returned <code>{"version": 42}</code>, so if Lyra’s player presses End turn right away, that command already carries 42.</p>',
+      state: [['Tracker version', '42', 1], ['Boss HP bar', '21/30 (DM only)', 1], ['Time taken', '≈ 100–300 ms']] },
+  ]
+  let at = 0
+  const dots = $('dots')
+  dots.innerHTML = STEPS.map((s, i) => `<button type="button" role="tab" aria-label="Step ${i + 1}: ${esc(s.title)}">${i + 1}</button>`).join('')
+  const show = (i) => {
+    at = Math.max(0, Math.min(STEPS.length - 1, i))
+    const s = STEPS[at]
+    $('lane').querySelectorAll('.st').forEach((el, k) => { el.className = `st${k === s.at ? ' on' : k < s.at ? ' past' : ''}` })
+    dots.querySelectorAll('button').forEach((b, k) => (k === at ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current')))
+    const stateHtml = `<div class="state">${s.state.map(([k, v, ch]) => `<div class="${ch ? 'changed' : ''}">${esc(k)}<b>${esc(v)}</b></div>`).join('')}</div>`
+    const wire = s.wire ? `<pre class="wire">${esc(s.wire)}</pre>` : ''
+    const code = s.code ? `<figure class="code" data-file="${esc(s.file)}" data-src="${s.code}" data-hl="${s.hl}"></figure>` : ''
+    $('stepBody').innerHTML = `<div><h3>${at + 1}. ${esc(s.title)}</h3>${s.text}${stateHtml}</div><div>${wire}${code}</div>`
+    const fig = $('stepBody').querySelector('figure.code')
+    if (fig) renderCode(fig)
+    bindGlossary($('stepBody'))
+    $('prev').disabled = at === 0
+    $('next').textContent = at === STEPS.length - 1 ? 'Start over ↺' : 'Next ▶'
+  }
+  $('prev').addEventListener('click', () => show(at - 1))
+  $('next').addEventListener('click', () => show(at === STEPS.length - 1 ? 0 : at + 1))
+  dots.querySelectorAll('button').forEach((b, k) => b.addEventListener('click', () => show(k)))
+  document.addEventListener('keydown', (e) => {
+    const r = $('click').getBoundingClientRect()
+    if (r.bottom < 0 || r.top > window.innerHeight || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return
+    if (e.key === 'ArrowRight') show(at + 1)
+    if (e.key === 'ArrowLeft') show(at - 1)
+  })
+  show(0)
+
+  /* ---------- failure scenarios ---------- */
+  const SCEN = [
+    ['Someone changed it first', 3, 'The DM pressed Next turn a moment earlier, so the fight is at version 42 but Lyra’s command says 41. The service refuses with <b>409</b>, “The table changed. Check and try again.” Nothing is applied; Lyra’s screen has already received the new snapshot, so the retry is based on the truth.'],
+    ['Not Lyra’s turn', 3, '<code>decide</code> refuses: <b>403</b>, “You can log attacks on your own turn.” The reason is shown on screen. No event, no version change.'],
+    ['Lyra is at 0 HP', 3, '<code>decide</code> refuses: <b>400</b>, “Lyra is at 0 HP and can’t attack. Heal them above 0 first.” (The button is hidden too, but the rule lives on the server.)'],
+    ['A forged request from another site', 2, 'No <code>X-Requested-With</code> header, so the interceptor answers <b>403</b> before any of our code runs.'],
+    ['Postgres is unreachable', 4, 'The transaction fails, the command is refused, and the in-memory copy was never changed, because it only moves forward after the database says yes.'],
+    ['Someone’s Wi-Fi drops', 5, 'Their stream breaks. The browser shows “Reconnecting…”, reconnects by itself, and receives a fresh full snapshot. Nothing to merge.'],
+    ['The server restarts (a deploy)', 6, 'All streams close and browsers reconnect to the new server. Each fight is rebuilt from its events the first time someone touches it. Nothing is lost.'],
+  ]
+  const scen = $('scen')
+  scen.innerHTML = SCEN.map(([t], i) => `<button type="button" aria-pressed="false" data-i="${i}">${esc(t)}</button>`).join('')
+  const pick = (i) => {
+    const [, stop, text] = SCEN[i]
+    scen.querySelectorAll('button').forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)))
+    $('lane2').querySelectorAll('.st').forEach((el, k) => { el.className = `st${k === stop ? ' fail' : k < stop ? ' past' : ' skip'}` })
+    $('scenText').innerHTML = `<p style="margin:0">${text}</p>`
+  }
+  scen.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => pick(Number(b.dataset.i))))
+  pick(0)
+
+  /* ---------- DM vs player ---------- */
+  const ROWS = [
+    { i: 21, p: 'GB', n: 'Goblin Boss', side: 'enemy', ac: 15, hp: '21/30', totals: 'dealt 13 · taken 9', cur: false },
+    { i: 15, p: 'L', n: 'Lyra', side: 'party', ac: 15, hp: '19/27', totals: { dm: 'dealt 9 · taken 8', pl: 'dealt 9 · taken 5' }, cur: true, you: true },
+    { i: 11, p: 'GA', n: 'Goblin Archer', side: 'enemy', ac: 14, hp: '9/9', totals: 'dealt 3 · taken 0', hidden: true },
+    { i: 9, p: 'B', n: 'Bram', side: 'party', ac: 16, hp: '19/31', totals: 'dealt 0 · taken 0' },
+  ]
+  const renderView = (v) => {
+    const pl = v === 'pl'
+    document.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)))
+    const rows = ROWS.filter((r) => !(pl && r.hidden))
+    $('miniRows').innerHTML = rows.map((r) => {
+      const secret = pl && r.side === 'enemy'
+      const tot = typeof r.totals === 'string' ? r.totals : r.totals[v]
+      return `<li class="${r.side}${r.hidden ? ' hidden' : ''}${r.cur ? ' cur' : ''}"><span class="i">${r.i}</span><span class="p">${esc(r.p)}</span><span class="n">${esc(r.n)}${r.hidden ? ' <small>Hidden</small>' : ''}<small>Fight: ${esc(tot)}</small></span><span class="v${secret ? ' no' : ''}">${secret ? '—' : r.ac}</span><span class="v${secret ? ' no' : ''}">${secret ? '—' : esc(r.hp)}</span></li>`
+    }).join('')
+    const j = (r) => {
+      const secret = pl && r.side === 'enemy'
+      const tot = typeof r.totals === 'string' ? r.totals : r.totals[v]
+      const [d, t] = tot.match(/\d+/g)
+      const val = (x) => (secret ? '<span class="nul">null</span>' : x)
+      return `  { <span class="k">"name":</span> "${esc(r.n)}", <span class="k">"side":</span> "${r.side.toUpperCase()}",\n    <span class="k">"ac":</span> ${val(r.ac)}, <span class="k">"hp":</span> ${val(r.hp.split('/')[0])}, <span class="k">"maxHp":</span> ${val(r.hp.split('/')[1])},\n    <span class="k">"controlledByViewer":</span> ${pl && r.you ? 'true' : 'false'}, <span class="k">"totals":</span> { <span class="k">"dealt":</span> ${d}, <span class="k">"taken":</span> ${t} } }`
+    }
+    const body = ROWS.map((r) => (pl && r.hidden ? '  <span class="gone">// Goblin Archer: not sent at all</span>' : j(r))).join(',\n')
+    $('miniJson').innerHTML = `{ <span class="k">"viewerIsDm":</span> ${pl ? 'false' : 'true'}, <span class="k">"round":</span> 3, <span class="k">"version":</span> 42,\n<span class="k">"combatants":</span> [\n${body}\n] }`
+  }
+  document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => renderView(b.dataset.view)))
+  renderView('dm')
+
+  /* ---------- transcript: as read / raw ---------- */
+  $('tRaw').textContent = `# Road ambush: fight transcript
+
+Tuesday Group · 2026-11-25 · 1 round · over
+
+## Round 1
+
+- Initiative order: Lyra 15 · Goblin 1 12 (enemy) · Goblin 2 8 (enemy)
+- **Lyra’s turn**
+  - Lyra → Goblin 1: hit, 12 damage (Goblin 1 0/7)
+  - Lyra → Goblin 2: miss (Goblin 2 7/7)
+- **Goblin 2’s turn**
+  - Goblin 2 → Lyra: hit, 5 damage (Lyra 22/27)
+
+## Summary
+
+| Combatant | Side | Dealt | Taken | Hits | Misses | Biggest hit | HP at end |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Lyra | party | 12 | 5 | 1 | 1 | 12 | 22/27 |
+| Goblin 2 | enemy | 5 | 0 | 1 | 0 | 5 | 7/7 |
+| Goblin 1 | enemy | 0 | 12 | 0 | 0 | 0 | 0/7 (down) |`
+  document.querySelectorAll('[data-tview]').forEach((b) => b.addEventListener('click', () => {
+    const raw = b.dataset.tview === 'raw'
+    document.querySelectorAll('[data-tview]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+    $('tRaw').hidden = !raw
+    $('tNice').hidden = raw
+  }))
+}
+</script>
+</body>
+</html>

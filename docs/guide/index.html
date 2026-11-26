@@ -1,0 +1,103 @@
+<meta charset="utf-8">
+<title>Combat D&amp;D Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="guide.css">
+<style>
+  .hero .wrap { display: grid; gap: clamp(20px, 3vw, 40px); }
+  @media (min-width: 900px) { .hero .wrap { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; } }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5em, 1fr)); gap: 10px; margin-top: 18px; }
+  .fact { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .fact b { display: block; font: 700 26px var(--display); color: var(--gold); line-height: 1.1; }
+  .fact span { font-size: 14px; color: var(--muted); }
+  /* the chapter list looks like the tracker: initiative, portrait, name, what you'll learn */
+  .order { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .order li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--party); border-radius: 12px; padding: 10px 14px; }
+  .order li.soon { opacity: 0.62; border-left-color: var(--border-strong); }
+  .order li.now { border-color: var(--gold); border-left-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft), 0 4px 18px var(--gold-soft); }
+  .order .disc { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font: 700 15px var(--display); border: 2px solid var(--party); background: color-mix(in srgb, var(--party) 16%, var(--surface)); }
+  .order li.soon .disc { border-color: var(--border-strong); background: var(--raised); }
+  .order li.now .disc { border-color: var(--gold); }
+  .order .name { font: 600 17px var(--display); }
+  .order .name a { color: var(--ink); text-decoration: none; }
+  .order .name a:hover { color: var(--gold); }
+  .order .what { font-size: 14px; color: var(--muted); }
+  .order .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border-strong); color: var(--muted); white-space: nowrap; }
+  .order .tag.turn { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .order .tag.ok { color: var(--ok); border-color: var(--ok); }
+  @media (max-width: 520px) { .order li { grid-template-columns: 34px minmax(0, 1fr); } .order .disc { width: 34px; height: 34px; font-size: 13px; } .order li > :last-child { grid-column: 2; justify-self: start; } }
+  .how { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(11em, 1fr)); }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html">COMBAT D&amp;D</a>
+    <span class="crumb">The guide</span>
+    <nav><button class="iconbtn" data-theme-toggle type="button"></button></nav>
+  </div>
+</header>
+
+<main>
+  <section class="band hero">
+    <div class="wrap">
+      <div>
+        <h1>How Combat D&amp;D works</h1>
+        <p class="lead">A guided tour of the whole system: the database, the rules, the server, the live updates, the screens, and the servers it all runs on. Every example is real code from the repository.</p>
+        <div class="facts">
+          <div class="fact"><b>4,300</b><span>lines of Kotlin</span></div>
+          <div class="fact"><b>3,500</b><span>lines of TypeScript</span></div>
+          <div class="fact"><b>6</b><span>database migrations</span></div>
+          <div class="fact"><b><span data-read-count>0</span>/10</b><span>chapters read</span></div>
+        </div>
+      </div>
+      <div>
+        <h2 class="small muted" style="font-family: var(--text); font-size: 14px; font-weight: 600; margin-bottom: 10px">Ten chapters, read in order. The next one is highlighted like the current turn.</h2>
+        <ol class="order" id="order"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>How to use it</h2>
+      <div class="how">
+        <div class="panel"><h3>Have the app running</h3><p class="small">Most chapters end with exercises. Start everything with <code>./scripts/dev.sh</code> so you can watch real requests and rows as you read.</p></div>
+        <div class="panel"><h3>Hover the dotted words</h3><p class="small">Terms like <dfn data-g="event-sourcing">event sourcing</dfn> and <dfn data-g="optimistic">optimistic concurrency</dfn> explain themselves. Tap them on a phone.</p></div>
+        <div class="panel"><h3>Every code block links out</h3><p class="small">Excerpts highlight the lines that matter. <b>full file ↗</b> opens the whole file on GitHub, so you can see the context.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="band"><div class="wrap">Combat D&amp;D · the guide lives in <code>docs/guide/</code> in the repository and is updated alongside the code.</div></footer>
+
+<script src="guide.js"></script>
+<script>
+{
+  // Chapters, highest "initiative" first. Pages that exist have a file; the rest are coming.
+  const CHAPTERS = [
+    ['ch0', '00-big-picture.html', 'The big picture', 'The pieces, the folder map, one click followed end to end, and reading a fight back'],
+    ['ch1', null, 'Data: Postgres and migrations', 'Every table, how the schema changes safely, why secrets are hashed'],
+    ['ch2', null, 'The core: event sourcing', 'decide, evolve and viewFor, and why undo and testing are easy'],
+    ['ch3', null, 'The backend: Spring Boot layers', 'Controllers, services, repositories, transactions, locks, caches, 409s'],
+    ['ch4', null, 'Real-time: Server-Sent Events', 'How every screen updates, heartbeats, reconnects, why one server'],
+    ['ch5', null, 'Security', 'Cookie sign-in, hashed tokens, CSRF, rate limits, input checking'],
+    ['ch6', null, 'The frontend: React and TypeScript', 'Vite, routing, TanStack Query, useEncounter, components, CSS'],
+    ['ch7', null, 'Building and testing', 'Gradle, npm, the three kinds of tests, linting, the dev script'],
+    ['ch8', null, 'Infrastructure', 'Docker, Render, Neon, secrets, CI and deploys, backups, cold starts'],
+    ['ch9', null, 'Thinking like a systems engineer', 'The trade-offs, what breaks first at scale, and what is missing'],
+  ]
+  const read = new Set(window.Guide.store.get('cdnd-guide-read', []))
+  const next = CHAPTERS.find(([id, file]) => file && !read.has(id))?.[0]
+  const { esc } = window.Guide
+  document.getElementById('order').innerHTML = CHAPTERS.map(([id, file, name, what], i) => {
+    const cls = !file ? 'soon' : id === next ? 'now' : ''
+    const tag = read.has(id) ? '<span class="tag ok">Read ✓</span>' : id === next ? '<span class="tag turn">Your turn</span>' : !file ? '<span class="tag">Coming</span>' : '<span class="tag">Ready</span>'
+    const title = file ? `<a href="${esc(file)}">${esc(name)}</a>` : esc(name)
+    return `<li class="${cls}"><span class="disc" aria-hidden="true">${i}</span><span><span class="name">${title}</span><br><span class="what">${esc(what)}</span></span>${tag}</li>`
+  }).join('')
+}
+</script>
