@@ -32,7 +32,9 @@ object TranscriptWriter {
                 appendLine()
             }
             if (line.turn) inTurn = true
-            appendLine(if (line.turn) "- **${md(line.text)}**" else if (inTurn) "  - ${md(line.text)}" else "- ${md(line.text)}")
+            val indent = if (line.turn || !inTurn) "" else "  "
+            appendLine(if (line.turn) "- **${md(line.text)}**" else "$indent- ${md(line.text)}")
+            line.notes.forEach { appendLine("$indent  - ↳ ${md(it)}") } // later changes to this attack, right under it
         }
 
         // Summary: every combatant still in the fight, by damage dealt.

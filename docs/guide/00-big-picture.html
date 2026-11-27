@@ -261,8 +261,8 @@
         <li><span><code>transcript(events)</code> replays them one by one with the same <code>evolve</code> the live tracker uses, writing a line for each.</span></li>
         <li><span>It answers with <code>Content-Disposition: attachment</code>, so the browser saves a file.</span></li>
       </ol>
-      <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/encounter/domain/Transcript.kt" data-src="c-transcript" data-hl="3,8">
-        <figcaption class="why"><b>The point:</b> the transcript can say “Goblin 1 0/7” at that moment, though HP was never stored. Replaying history recomputes it. With only current numbers in the database, this feature would be impossible.</figcaption>
+      <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/encounter/domain/Transcript.kt" data-src="c-transcript" data-hl="3,8,11-12">
+        <figcaption class="why"><b>The point:</b> the transcript can say “Goblin 1 2/7” at that moment, though HP was never stored. Replaying history recomputes it. With only current numbers in the database, this feature would be impossible. And because each attack’s line is remembered, a correction made rounds later is written right under the attack it fixes, with the round it happened in.</figcaption>
       </figure>
     </div>
     <div>
@@ -276,7 +276,7 @@
         <h5>Round 1</h5>
         <ul>
           <li>Initiative order: Lyra 15 · Goblin 1 12 (enemy) · Goblin 2 8 (enemy)</li>
-          <li><b>Lyra’s turn</b><ul><li>Lyra → Goblin 1: hit, 12 damage (Goblin 1 0/7)</li><li>Lyra → Goblin 2: miss (Goblin 2 7/7)</li></ul></li>
+          <li><b>Lyra’s turn</b><ul><li>Lyra → Goblin 1: hit, 5 damage (Goblin 1 2/7)<ul><li>↳ corrected in round 1: hit, 12 damage (Goblin 1 0/7)</li></ul></li><li>Lyra → Goblin 2: miss (Goblin 2 7/7)</li></ul></li>
           <li><b>Goblin 2’s turn</b><ul><li>Goblin 2 → Lyra: hit, 5 damage (Lyra 22/27)</li></ul></li>
         </ul>
         <h5>Summary</h5>
@@ -316,7 +316,7 @@
       <li><label><input type="checkbox"> Skip the CSRF header</label><p class="small muted">Run the same command without <code>-H 'X-Requested-With: curl'</code>. You get 403: the <dfn data-g="csrf">CSRF</dfn> guard.</p></li>
       <li><label><input type="checkbox"> Read the event log</label><p class="small muted">Your attack is there as JSON. There’s no HP column for fights anywhere: it’s all computed.</p>
         <div class="cmd"><pre>docker compose exec db psql -U combat combat_dnd -c "select seq, batch, actor_role, type, payload from encounter_event order by seq desc limit 5"</pre><button class="btn" data-copy type="button">Copy</button></div></li>
-      <li><label><input type="checkbox"> Replay a fight</label><p class="small muted">Download the dev fight’s transcript. Log an attack, edit it in the Turn log, and download again: a “Correction:” line appears. Swap <code>as=dm</code> for <code>as=player:00000000-0000-4000-8000-00000000017a</code> to get 403.</p>
+      <li><label><input type="checkbox"> Replay a fight</label><p class="small muted">Download the dev fight’s transcript with the command below. Then, on the DM screen: log an attack, scroll to the <b>Turn log</b> card under the tracker (not the Log attack panel, whose rows only have Remove), press <b>Edit</b> on that attack, change the damage and press <b>Save</b>. Download again: under your attack’s line there’s now a note, “↳ corrected in round …”, with HP right after the fix. Swap <code>as=dm</code> for <code>as=player:00000000-0000-4000-8000-00000000017a</code> to get 403. You don’t need to end the fight: the transcript covers it so far.</p>
         <div class="cmd"><pre>curl -s 'http://localhost:8080/api/encounters/00000000-0000-4000-8000-0000000000a1/transcript?format=md&amp;as=dm'</pre><button class="btn" data-copy type="button">Copy</button></div></li>
     </ul>
   </div>
@@ -369,8 +369,11 @@ for (event in events) {
         is Event.AttackLogged -> {
             val target = after.combatant(event.targetId)
             line("${name(event.attackerId)} → ${target.name}: ${result(event.hit, event.damage)} (${target.name} ${hpOf(after, target.id)})")
+            lineOf[event.id] = lines.lastIndex   // remember where this attack's line is
         }
-        is Event.AttackEdited -> line("Correction: … is now ${result(event.hit, event.damage)} …")
+        // A later fix is noted beside the attack it changes, not further down the story.
+        is Event.AttackEdited -> note(event.id, "corrected in round ${after.round}: ${result(event.hit, event.damage)} (…)")
+        is Event.AttackDeleted -> note(event.id, "removed in round ${after.round}")
         // … one branch per kind of event
     }
     state = after
@@ -656,7 +659,8 @@ Tuesday Group · 2026-11-25 · 1 round · over
 
 - Initiative order: Lyra 15 · Goblin 1 12 (enemy) · Goblin 2 8 (enemy)
 - **Lyra’s turn**
-  - Lyra → Goblin 1: hit, 12 damage (Goblin 1 0/7)
+  - Lyra → Goblin 1: hit, 5 damage (Goblin 1 2/7)
+    - ↳ corrected in round 1: hit, 12 damage (Goblin 1 0/7)
   - Lyra → Goblin 2: miss (Goblin 2 7/7)
 - **Goblin 2’s turn**
   - Goblin 2 → Lyra: hit, 5 damage (Lyra 22/27)

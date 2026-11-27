@@ -31,29 +31,53 @@ class TranscriptTest {
     )
 
     @Test
-    fun `the replay tells the story in order, with HP as it was`() {
+    fun `the replay tells the story in order, with HP as it was, and changes noted beside the attack`() {
         val t = transcript(events)
         assertEquals(
             listOf(
                 "1: Initiative order: Lyra 15 · Goblin 12 (enemy) · Spy 5 (NPC, hidden)",
                 "1: *Lyra’s turn",
-                "1: Lyra → Goblin: hit, 4 damage (Goblin 3/7)",
-                "1: Correction: Lyra → Goblin is now hit, 12 damage (Goblin 0/7)",
+                "1: Lyra → Goblin: hit, 4 damage (Goblin 3/7) [corrected in round 1: hit, 12 damage (Goblin 0/7)]",
                 "1: *Goblin’s turn",
                 "1: Goblin → Lyra: hit, 5 damage (Lyra 22/27)",
-                "1: Goblin → Lyra: miss (Lyra 22/27)",
-                "1: Entry removed: Goblin → Lyra (miss)",
+                "1: Goblin → Lyra: miss (Lyra 22/27) [removed in round 1]",
                 "1: Lyra’s HP set to 25/27 (was 22/27)",
                 "1: Goblin defeated",
                 "2: *Lyra’s turn",
             ),
-            t.lines.map { "${it.round}: ${if (it.turn) "*" else ""}${it.text}" },
+            t.lines.map(::show),
         )
         // The attack list is the final word: corrected values, deleted entries gone.
         assertEquals(listOf("Lyra→Goblin hit 12 (0/7) corrected", "Goblin→Lyra hit 5 (22/27)"), t.attacks.map {
             "${it.attacker}→${it.target} ${if (it.hit) "hit" else "miss"} ${it.damage} (${it.targetHp}/${it.targetMaxHp})" + if (it.corrected) " corrected" else ""
         })
     }
+
+    @Test
+    fun `fixes made later stay beside the attack, each one noted in order with the round it happened in`() {
+        val t = transcript(
+            listOf(
+                Event.CombatantAdded(c(lyra, "Lyra", Side.PARTY, 15, 27)),
+                Event.CombatantAdded(c(gob, "Goblin", Side.ENEMY, 12, 7)),
+                Event.TurnChanged(lyra, 1),
+                Event.AttackLogged(AttackId("a1"), 1, lyra, gob, hit = true, damage = 4),
+                Event.TurnChanged(gob, 1),
+                Event.TurnChanged(lyra, 2),
+                Event.AttackEdited(AttackId("a1"), hit = true, damage = 5),
+                Event.AttackEdited(AttackId("a1"), hit = false, damage = 0),
+                Event.AttackDeleted(AttackId("a1")),
+            ),
+        )
+        val a1 = t.lines.first { it.text.startsWith("Lyra → Goblin") }
+        assertEquals(1, a1.round)
+        assertEquals("Lyra → Goblin: hit, 4 damage (Goblin 3/7)", a1.text) // as it happened
+        assertEquals(listOf("corrected in round 2: hit, 5 damage (Goblin 2/7)", "corrected in round 2: miss (Goblin 7/7)", "removed in round 2"), a1.notes)
+        assertTrue(t.lines.none { it.text.startsWith("Correction") || it.text.startsWith("Entry removed") }) // no separate lines
+        assertTrue(t.attacks.isEmpty()) // and gone from the final attack list
+    }
+
+    private fun show(l: TranscriptLine) =
+        "${l.round}: ${if (l.turn) "*" else ""}${l.text}" + if (l.notes.isEmpty()) "" else l.notes.joinToString("; ", " [", "]")
 
     @Test
     fun `totals count damage as logged, and players only count what they can see`() {
