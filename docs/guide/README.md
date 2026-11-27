@@ -11,6 +11,7 @@ runs on. It's a set of HTML pages (GitHub shows them as source, not as pages):
 | --- | --- |
 | `index.html` | Contents and reading progress |
 | `00-big-picture.html` | Chapter 0: the pieces, the folder map, one click end to end, the transcript flow |
+| `01-data.html` | Chapter 1: the schema version by version, how the app talks to Postgres, Flyway, constraints, the event log, secrets |
 | `guide.css`, `guide.js` | Shared look and behaviour (theme, glossary tooltips, code blocks, checklists, quizzes) |
 
 Chapters are added as they're written. Code excerpts are copied from `main`; when the code changes,

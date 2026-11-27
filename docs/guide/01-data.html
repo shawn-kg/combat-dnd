@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Data and Migrations · Combat D&amp;D Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="guide.css">
+<style>
+  /* ---------- schema map ---------- */
+  .ver { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 8px 0 16px; }
+  .ver input[type=range] { flex: 1 1 260px; accent-color: var(--gold); height: 32px; }
+  .ver .vlabel { font: 700 22px var(--display); color: var(--gold); min-width: 3ch; }
+  .ticks { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ticks button { border: 1px solid var(--border-strong); background: var(--raised); color: var(--ink); border-radius: 8px; padding: 6px 10px; font: 600 13px var(--mono); cursor: pointer; min-height: 36px; }
+  .ticks button[aria-pressed='true'] { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+  .schema { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15em), 1fr)); }
+  .grp { border: 1px dashed var(--border-strong); border-radius: 14px; padding: 10px; display: grid; gap: 8px; align-content: start; }
+  .grp > span { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .tbl { text-align: left; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 8px 10px; cursor: pointer; font: 13px/1.45 var(--mono); transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s; }
+  .tbl b { display: block; font: 600 15px var(--display); margin-bottom: 2px; }
+  .tbl .cols { color: var(--muted); overflow-wrap: anywhere; }
+  .tbl.absent { opacity: 0.22; border-style: dashed; }
+  .tbl.new { border-color: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+  .tbl.changed { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+  .tbl.related { border-color: var(--party); }
+  .tbl[aria-pressed='true'] { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft), 0 6px 18px var(--gold-soft); }
+  .tbl .badge { float: right; font: 700 11px var(--text); padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; }
+  .tbl.new .badge { color: var(--ok); }
+  .tbl.changed .badge { color: var(--gold); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 2px solid; }
+  .detailgrid { display: grid; gap: 18px; margin-top: 18px; }
+  @media (min-width: 980px) { .detailgrid { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); align-items: start; } }
+  .cols-table td:first-child { font-family: var(--mono); font-size: 14px; white-space: nowrap; }
+  .cols-table td:nth-child(2) { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .cols-table tr.addedrow td:first-child::after { content: ' new'; font: 700 10px var(--text); color: var(--ok); }
+  .rel { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 14px; }
+  .rel li { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  .rel code { font-size: 12.5px; }
+
+  /* ---------- the pipe ---------- */
+  .pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 6px 0 16px; }
+  .pipe div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; font-size: 13px; color: var(--muted); text-align: center; position: relative; }
+  .pipe div b { display: block; font: 600 14px var(--display); color: var(--ink); }
+  .pipe div + div::before { content: '→'; position: absolute; left: -9px; top: 50%; transform: translateY(-50%); color: var(--gold); font-size: 14px; }
+  @media (max-width: 760px) { .pipe { grid-template-columns: minmax(0, 1fr); } .pipe div + div::before { content: '↓'; left: 50%; top: -14px; transform: translateX(-50%); } }
+
+  /* ---------- flyway timeline ---------- */
+  .fly { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .fly li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .fly .n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-soft); border: 1px solid var(--gold); color: var(--gold); font: 700 14px var(--display); }
+  .patterns { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16em), 1fr)); }
+
+  /* ---------- try to break it ---------- */
+  .breaks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .breaks button { border: 1px solid var(--border-strong); background: var(--raised); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: 600 14px var(--text); cursor: pointer; min-height: 40px; }
+  .breaks button[aria-pressed='true'] { background: var(--enemy); color: #fff; border-color: var(--enemy); }
+  .err { background: color-mix(in srgb, var(--enemy) 10%, var(--code-bg)); border: 1px solid color-mix(in srgb, var(--enemy) 45%, var(--border)); border-radius: 10px; padding: 10px 12px; font: 13px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
+  .sqlbox { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: 13px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
+  .err.ok { background: color-mix(in srgb, var(--ok) 10%, var(--code-bg)); border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+
+  /* ---------- event rows ---------- */
+  .events td, .events th { font-size: 13px; white-space: nowrap; }
+  .events td.p { font-family: var(--mono); white-space: normal; min-width: 22em; overflow-wrap: anywhere; }
+  .events tr.undone td { text-decoration: line-through; color: var(--muted); }
+  .events tr.locked td:first-child::before { content: '🔒 '; }
+
+  /* ---------- hashing demo ---------- */
+  .hash { display: grid; gap: 14px; }
+  @media (min-width: 900px) { .hash { grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr); align-items: stretch; } }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .box h3 { font-size: 17px; }
+  .box .val { font: 13.5px/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; min-height: 44px; }
+  .oneway { display: grid; place-items: center; color: var(--gold); font: 700 13px var(--text); text-align: center; }
+  .oneway span { font-size: 26px; display: block; }
+  .row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .stored { table-layout: fixed; }
+  .stored td:first-child { width: 34%; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html">COMBAT D&amp;D</a>
+    <span class="crumb">Chapter 1 · Data: Postgres and migrations</span>
+    <nav>
+      <a class="iconbtn hide-s" href="index.html">Contents</a>
+      <button class="iconbtn" data-theme-toggle type="button"></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ======================= 1. the schema at any version ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h1>Data: Postgres and migrations</h1>
+    <p class="lead">Everything that has to survive a restart lives in 12 tables in one Postgres database. They weren’t designed in one go: six migration files built them up as features arrived. Drag the slider to replay that history, and click any table to look inside.</p>
+
+    <div class="ver">
+      <span class="vlabel" id="vLabel">V6</span>
+      <input type="range" id="vRange" min="1" max="6" step="1" value="6" aria-label="Schema version">
+      <div class="ticks" id="vTicks" role="group" aria-label="Migrations"></div>
+    </div>
+    <div class="schema" id="schema"></div>
+    <div class="legend"><span><i style="border-color: var(--ok)"></i>added in this migration</span><span><i style="border-color: var(--gold)"></i>changed in this migration</span><span><i style="border-color: var(--party)"></i>linked to the selected table</span><span><i style="border-color: var(--border-strong); border-style: dashed"></i>doesn’t exist yet</span></div>
+
+    <div class="detailgrid">
+      <div class="panel" id="tDetail" aria-live="polite"></div>
+      <div>
+        <div class="panel" id="vNote" aria-live="polite"></div>
+        <figure class="code" id="vSql" style="margin-top: 14px"></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 2. why postgres ======================= -->
+<section class="band">
+  <div class="wrap split">
+    <div class="read">
+      <h2>Why Postgres, and a few choices in the columns</h2>
+      <p><b>Relational, with real rules.</b> Campaigns own players, characters and encounters; encounters own their events. Postgres stores those links as <b>foreign keys</b> and enforces them, along with checks like “HP can’t be negative”. The database refuses bad data even if the code has a bug.</p>
+      <p><b>JSON where it helps.</b> Each event’s details go in a <code>payload</code> column of type <dfn data-g="jsonb">jsonb</dfn>, because the twelve kinds of event have different fields. One table, no schema change per event type.</p>
+      <p><b>Neon</b> runs a normal Postgres 18 for us, sleeps when nobody’s using it, and keeps a 6-hour restore window. Locally the same code runs against Postgres in Docker.</p>
+    </div>
+    <div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Choice</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>uuid</code> ids from <code>gen_random_uuid()</code></td><td>Unguessable (you can’t try <code>/campaigns/2</code> after seeing <code>/campaigns/1</code>), and safe to put in links.</td></tr>
+            <tr><td><code>timestamptz</code></td><td>Stores an exact moment in UTC, so times don’t shift with anyone’s time zone.</td></tr>
+            <tr><td><code>text</code> + <code>check (status in (…))</code></td><td>A readable status column that can still only hold the allowed values.</td></tr>
+            <tr><td><code>bytea</code> for portraits</td><td>A few KB of JPEG per picture; keeping them here means no file storage service and they’re in every backup.</td></tr>
+            <tr><td><code>bigint</code> versions and sequence numbers</td><td>Counters that never run out.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 3. how the app talks to it ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>How the app talks to Postgres</h2>
+    <p class="lead">No <abbr title="Object-relational mapping, like Hibernate">ORM</abbr>: every query is plain SQL you can read in the repository classes. Here’s the path one query takes.</p>
+    <div class="pipe">
+      <div><b>Service</b>decides what to do, opens a <dfn data-g="transaction">transaction</dfn></div>
+      <div><b>Repository</b>one method per query, plain SQL</div>
+      <div><b>JdbcClient</b>Spring fills in <code>?</code> safely and maps rows</div>
+      <div><b>HikariCP pool</b>at most 5 open connections</div>
+      <div><b>Postgres on Neon</b>over TLS, port 5432</div>
+    </div>
+    <div class="split">
+      <div>
+        <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/campaign/CampaignRepository.kt" data-src="c-claim" data-hl="3">
+          <figcaption class="why"><b>A race handled by SQL:</b> two players pick the same character at the same moment. Both send this. Postgres runs the updates one at a time; the first sets <code>player_id</code>, so for the second <code>player_id is null</code> is no longer true and it updates 0 rows. The app turns 0 into “Someone else just chose that character.” No lock in our code needed.</figcaption>
+        </figure>
+        <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/encounter/app/EncounterRepository.kt" data-src="c-events" data-hl="2">
+          <figcaption class="why"><b>Replaying a fight</b> is one query: every event of the encounter that isn’t undone, in order. Two indexes start with <code>encounter_id</code> (the primary key <code>(encounter_id, seq)</code> and <code>encounter_event_batch_idx</code>), so Postgres jumps straight to this fight’s rows instead of reading everyone else’s. It stays fast however many fights there are.</figcaption>
+        </figure>
+      </div>
+      <div>
+        <p><b>Why <code>?</code> placeholders matter.</b> Values never get pasted into the SQL text; they’re sent separately. So a character named <code>'; drop table campaign; --</code> is just a strange name, not a command. That’s how SQL injection is prevented everywhere here.</p>
+        <p><b>Why a pool.</b> Opening a database connection takes a TLS handshake and a login, tens of milliseconds. HikariCP keeps a few open and lends them out. Our settings:</p>
+        <figure class="code" data-file="backend/src/main/resources/application.yml" data-src="c-yml" data-hl="5-8">
+          <figcaption class="why"><b>Sized for the free plan.</b> Five is plenty for one group. <code>minimum-idle: 0</code> lets every connection close after a minute of quiet, which is what lets Neon go to sleep between sessions (an open connection would keep it awake and use up free compute hours).</figcaption>
+        </figure>
+        <p class="small muted">And the address: Neon gives <code>postgresql://user:pass@host/db</code>, but the Java driver wants <code>jdbc:postgresql://host/db</code> with the user and password separate. <code>CombatDndApplication.kt</code> converts it before Spring starts, so you can paste Neon’s string as is.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 4. flyway ======================= -->
+<section class="band">
+  <div class="wrap split">
+    <div class="read">
+      <h2>Migrations: changing a live database safely</h2>
+      <p>The schema isn’t set up by hand. Each change is a numbered SQL file, and <b>Flyway</b> applies them in order when the app starts:</p>
+      <ol class="fly">
+        <li><span class="n">1</span><span>Spring starts and hands the database connection to Flyway before anything else runs.</span></li>
+        <li><span class="n">2</span><span>Flyway reads its own table, <code>flyway_schema_history</code>: which versions are applied, and a <b>checksum</b> of each file.</span></li>
+        <li><span class="n">3</span><span>It runs any new files in version order, each in a transaction, and records them.</span></li>
+        <li><span class="n">4</span><span>If an already-applied file’s checksum no longer matches, it refuses to start.</span></li>
+      </ol>
+      <div class="note"><b>You’ve met step 4.</b> Early on, V1 was edited after your local database had already run it, and the backend wouldn’t start: “Migration checksum mismatch for migration version 1”. The fix was to wipe the local database (<code>docker compose down -v</code>). On the live database, wiping isn’t an option, which is why the rule is: <b>never edit a migration that has run anywhere; add a new one.</b></div>
+    </div>
+    <div>
+      <h3>Patterns that keep old data working</h3>
+      <div class="patterns">
+        <div class="panel"><b>Add with a default</b><p class="small" style="margin:6px 0 0">V2 adds <code>locked_batch … not null default 0</code>. Existing encounters get 0 at once, so a <code>not null</code> column can be added to a table that already has rows.</p></div>
+        <div class="panel"><b>Add as optional</b><p class="small" style="margin:6px 0 0">V6 adds <code>dndbeyond_url</code> with no default: it’s simply empty for every existing character.</p></div>
+        <div class="panel"><b>Move data in the same step</b><p class="small" style="margin:6px 0 0">V4 creates <code>dm_device</code> and copies every campaign’s existing DM token into it in the same file, so no DM was signed out by the upgrade.</p></div>
+        <div class="panel"><b>Relax before removing</b><p class="small" style="margin:6px 0 0">V4 makes the old <code>dm_token_hash</code> optional instead of dropping it. A later migration can drop it once nothing uses it: the “expand, then contract” pattern.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 5. try to break it ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Try to break it</h2>
+    <p class="lead">The code checks input, but the database has the last word. Pick something that shouldn’t be possible and see what stops it.</p>
+    <div class="breaks" id="breaks"></div>
+    <div class="split">
+      <div><pre class="sqlbox" id="bSql"></pre><pre class="err" id="bOut"></pre></div>
+      <div class="panel" id="bWhy" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 6. the event log ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>The event log, up close</h2>
+    <p class="lead">Chapter 2 is about why fights are stored as events. Here’s what that looks like on disk: the last rows of one fight.</p>
+    <div class="scroll">
+      <table class="events">
+        <thead><tr><th>seq</th><th>batch</th><th>actor_role</th><th>type</th><th>payload (jsonb)</th><th>undone</th></tr></thead>
+        <tbody>
+          <tr class="locked"><td>1–7</td><td>1</td><td>DM</td><td>CombatantAdded ×7</td><td class="p">{"combatant":{"id":"…","name":"Goblin Boss","side":"ENEMY","hp":30,…}} …</td><td>false</td></tr>
+          <tr><td>8</td><td>2</td><td>DM</td><td>InitiativesSet</td><td class="p">{"initiatives":{"lyra-id":15,"boss-id":21,…}}</td><td>false</td></tr>
+          <tr><td>9</td><td>3</td><td>DM</td><td>TurnChanged</td><td class="p">{"currentId":"boss-id","round":1}</td><td>false</td></tr>
+          <tr><td>10</td><td>4</td><td>DM</td><td>AttackLogged</td><td class="p">{"id":"a1","round":1,"attackerId":"boss-id","targetId":"thorin-id","hit":true,"damage":6}</td><td>false</td></tr>
+          <tr class="undone"><td>11</td><td>5</td><td>DM</td><td>AttackLogged</td><td class="p">{"id":"a2","round":1,"attackerId":"boss-id","targetId":"lyra-id","hit":true,"damage":40}</td><td>true</td></tr>
+          <tr><td>12</td><td>6</td><td>PLAYER</td><td>AttackLogged</td><td class="p">{"id":"a2","round":1,"attackerId":"lyra-id","targetId":"boss-id","hit":true,"damage":9}</td><td>false</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="split" style="margin-top: 18px">
+      <div class="read">
+        <p><b><code>seq</code></b> orders every event in a fight. <b><code>batch</code></b> groups the events one command produced (start combat adds seven combatants as one batch); it’s the tracker’s version number at the moment the command was applied.</p>
+        <p><b>Undo</b> never deletes anything: it sets <code>undone = true</code> on the latest batch and replays. Row 11 is a 40-damage typo the DM undid. <b><code>locked_batch</code></b> (V2) stops undo at the roster that Start combat wrote, shown with 🔒.</p>
+        <p><b><code>actor_role</code> and <code>actor_id</code></b> record who did it, which is how the transcript and any future audit can say who changed what.</p>
+      </div>
+      <div>
+        <figure class="code" data-file="backend/src/main/kotlin/app/combatdnd/encounter/app/EventCodec.kt" data-src="c-codec" data-hl="3,5">
+          <figcaption class="why"><b>A trap worth knowing.</b> The <code>type</code> column stores the Kotlin class name. Rename <code>AttackLogged</code> to <code>AttackRecorded</code> and every saved fight fails to load: “Unknown event type AttackLogged”. Stored events are a contract with the past. New fields are fine as long as they have defaults (NPC’s <code>statsVisible</code> was added that way, and a test checks old events still load).</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 7. secrets ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Secrets: the database never sees them</h2>
+    <p class="lead">There are no passwords. Each browser gets a random secret in a cookie, and the database keeps only a fingerprint of it. Make one yourself: this runs in your browser with the same method the server uses.</p>
+    <div class="hash">
+      <div class="box">
+        <h3>The cookie (your browser keeps this)</h3>
+        <p class="small muted">32 random bytes, written in URL-safe Base64, like <code>Session.newToken()</code>.</p>
+        <div class="val" id="hTok">—</div>
+        <div class="row-btns"><button class="btn primary" id="hNew" type="button">Make a new token</button><button class="btn" id="hEdit" type="button">Change one letter</button></div>
+      </div>
+      <div class="oneway" aria-hidden="true"><div><span>→</span>SHA-256<br>one way</div></div>
+      <div class="box">
+        <h3>The database (keeps only this)</h3>
+        <p class="small muted">Its SHA-256 hash in hex, like <code>Session.hash()</code>, stored in <code>dm_device.token_hash</code> or <code>player.token_hash</code>.</p>
+        <div class="val" id="hHash">—</div>
+        <p class="small" id="hNoteTxt" style="margin: 12px 0 0">Change one letter of the token and the hash changes completely. There’s no way back from the hash to the token.</p>
+      </div>
+    </div>
+    <div class="split" style="margin-top: 20px">
+      <div class="read">
+        <p><b>Signing in</b> is: hash the cookie that came with the request, then look for a row with that hash. A match means it’s you. A database leak only reveals hashes, which can’t be turned back into cookies, so nobody can sign in with them.</p>
+        <p><b>Why SHA-256 and not bcrypt?</b> Slow hashes like bcrypt exist for passwords, because people choose guessable ones and attackers try billions of guesses. Our tokens are 256 random bits: there’s nothing to guess, so a fast hash is the right tool, and every request stays quick.</p>
+        <p><b>The join code is different.</b> Six characters from a 31-character alphabet (no 0/O or 1/I/L, so it survives being read aloud): 31⁶ ≈ <b>887 million</b> codes. Guessable in principle, which is why joining is rate-limited (30 tries per address per 10 minutes) and the DM still approves everyone.</p>
+      </div>
+      <div class="scroll">
+        <table class="stored">
+          <thead><tr><th>Secret</th><th>What the database keeps</th></tr></thead>
+          <tbody>
+            <tr><td>DM’s browser cookie</td><td><code>dm_device.token_hash</code>: its hash</td></tr>
+            <tr><td>Player’s browser cookie</td><td><code>player.token_hash</code>: its hash</td></tr>
+            <tr><td>DM sign-in link</td><td><code>campaign.dm_link_hash</code>: its hash (that’s why it’s shown only once)</td></tr>
+            <tr><td>Join code</td><td><code>campaign.join_code</code>: as is (it’s meant to be shared)</td></tr>
+            <tr><td>Database password</td><td>Not in the database or the repo: only in Render’s and GitHub’s secret settings</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 8. gaps ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Honest gaps</h2>
+    <p class="lead">Things a reviewer would point out. None of them matter for one group today; each is a good small exercise.</p>
+    <div class="ideas" style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16em), 1fr))">
+      <div class="panel"><b>Two missing indexes</b><p class="small" style="margin:6px 0 0"><code>encounter</code> and <code>monster_template</code> are looked up by <code>campaign_id</code> but have no index on it, unlike the other tables. With hundreds of rows Postgres scans them in microseconds; with millions it would matter.</p></div>
+      <div class="panel"><b>A leftover column</b><p class="small" style="margin:6px 0 0"><code>campaign.dm_token_hash</code> stopped being read in V4. The “contract” half of expand/contract (dropping it) hasn’t happened yet.</p></div>
+      <div class="panel"><b>Portrait keys aren’t foreign keys</b><p class="small" style="margin:6px 0 0"><code>portrait_key</code> columns aren’t linked to <code>portrait.key</code>, so the database won’t stop a dangling key. The code checks it instead, and deleting a character doesn’t delete its picture.</p></div>
+      <div class="panel"><b>A stale comment</b><p class="small" style="margin:6px 0 0">V1 still says <code>portrait_key</code> is an “object-storage key”. Portraits moved into Postgres in V3. Old migrations can’t be edited, so old comments stay as they were.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 9. try this ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Try this</h2>
+    <p class="lead">With <code>./scripts/dev.sh</code> running, open a database shell in another terminal and keep it open for the rest:</p>
+    <div class="cmd" style="margin-bottom: 16px"><pre>docker compose exec db psql -U combat combat_dnd</pre><button class="btn" data-copy type="button">Copy</button></div>
+    <ul class="todo" data-store="ch1-try">
+      <li><label><input type="checkbox"> Look around</label><p class="small muted">List the tables, then describe one: you’ll see the columns, the checks and the foreign keys from the map above.</p>
+        <div class="cmd"><pre>\dt
+\d character</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Read Flyway’s notebook</label><p class="small muted">Every migration that has run, when, and its checksum.</p>
+        <div class="cmd"><pre>select version, description, checksum, installed_on, success from flyway_schema_history order by installed_rank;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Break a rule on purpose</label><p class="small muted">Try to add a character with −1 HP to the dev campaign. Postgres refuses and names the check; nothing is saved.</p>
+        <div class="cmd"><pre>insert into character (campaign_id, name, ac, max_hp, current_hp) select id, 'Test', 10, 10, -1 from campaign limit 1;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Find yourself by your hash</label><p class="small muted">In the app (port 5173), start a campaign as the DM. Open DevTools → Application → Cookies → <code>http://localhost:5173</code> and copy the value of <code>cdnd_dm_…</code>. Hash it in a normal terminal, then look for that hash in the shell.</p>
+        <div class="cmd"><pre>printf '%s' 'PASTE-THE-COOKIE-VALUE' | sha256sum</pre><button class="btn" data-copy type="button">Copy</button></div>
+        <div class="cmd"><pre>select c.name, d.created_at from dm_device d join campaign c on c.id = d.campaign_id where d.token_hash = 'PASTE-THE-HASH';</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> Watch undo in the table</label><p class="small muted">Log an attack in the dev fight as the DM, press Undo, then look at the newest rows: the attack is still there, with <code>undone = t</code>.</p>
+        <div class="cmd"><pre>select seq, batch, type, undone from encounter_event order by created_at desc limit 4;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> See an index at work</label><p class="small muted">Ask Postgres how it would replay the dev fight. Look for an index scan on one of the two indexes that start with <code>encounter_id</code>: in testing it was <code>Bitmap Index Scan on encounter_event_batch_idx</code>, followed by a <code>Sort</code> on <code>seq</code>. The planner picks whichever looks cheapest, and on a tiny table it may even read every row directly.</p>
+        <div class="cmd"><pre>explain select type, payload from encounter_event where encounter_id = '00000000-0000-4000-8000-0000000000a1' and not undone order by seq;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================= 10. quick check ======================= -->
+<section class="band">
+  <div class="wrap">
+    <h2>Quick check</h2>
+    <div class="quiz">
+      <div class="q" data-answer="2"><p>You need a new column on <code>character</code>. What do you do?</p>
+        <div class="opts"><button>Edit V1 and add the column there</button><button>Run <code>alter table</code> by hand on Neon</button><button>Add <code>V7__something.sql</code> with an <code>alter table</code>, and let Flyway apply it on the next start</button></div>
+        <div class="explain" hidden><b></b>V1 has already run everywhere, so editing it makes Flyway refuse to start (checksum mismatch). Hand changes aren’t recorded and won’t happen on anyone else’s database. A new migration runs once everywhere, in order.</div></div>
+      <div class="q" data-answer="1"><p>Someone steals a copy of the database. Can they sign in as the DM?</p>
+        <div class="opts"><button>Yes: the DM’s token is in <code>dm_device</code></button><button>No: only hashes are stored, and a hash can’t be turned back into the cookie</button><button>Only if they also know the join code</button></div>
+        <div class="explain" hidden><b></b>The server hashes whatever cookie arrives and compares hashes. A stolen hash can’t be sent as a cookie, because the server would hash it again and get something different.</div></div>
+      <div class="q" data-answer="0"><p>Two players click the same character at the same instant. What makes sure only one gets it?</p>
+        <div class="opts"><button>The update only applies <code>where player_id is null</code>, so the second one changes 0 rows</button><button>A lock in the Kotlin code</button><button>Nothing: whoever is second overwrites the first</button></div>
+        <div class="explain" hidden><b></b>Postgres applies the two updates one after the other; the condition is checked against the latest data. The unique constraint on <code>player_id</code> is a second safety net.</div></div>
+      <div class="q" data-answer="2"><p>Why can’t the <code>AttackLogged</code> event class simply be renamed?</p>
+        <div class="opts"><button>Kotlin doesn’t allow renaming sealed classes</button><button>It would break the frontend</button><button>Saved events store the class name as their type, so old fights couldn’t be read back</button></div>
+        <div class="explain" hidden><b></b>The <code>type</code> column says <code>AttackLogged</code> for every attack ever logged. A rename needs a mapping from old names (or a migration that rewrites the column).</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap next">
+    <a class="btn" href="00-big-picture.html">◀ Chapter 0</a>
+    <button class="btn" data-mark-read="ch1" type="button">Mark this chapter read</button>
+    <a class="btn primary" href="index.html">Contents · Chapter 2 next ▶</a>
+  </div>
+</section>
+</main>
+
+<footer class="band"><div class="wrap">Combat D&amp;D guide · Chapter 1 · Code and migrations are from <code>main</code>; follow “full file ↗” for context.</div></footer>
+
+<!-- ======================= code (plain text) ======================= -->
+<script type="text/plain" id="c-claim">
+/** Claims only if still unclaimed; false when someone got there first. */
+fun claim(characterId: UUID, playerId: UUID): Boolean =
+    jdbc.sql("update character set player_id = ? where id = ? and player_id is null").params(playerId, characterId).update() == 1
+</script>
+<script type="text/plain" id="c-events">
+fun events(encounterId: UUID): List<Event> =
+    jdbc.sql("select type, payload::text as payload from encounter_event where encounter_id = ? and not undone order by seq")
+        .param(encounterId)
+        .query { rs, _ -> codec.decode(rs.getString("type"), rs.getString("payload")) }
+        .list()
+</script>
+<script type="text/plain" id="c-yml">
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/combat_dnd}
+    hikari:
+      # Small pool, and no idle connections kept open, so the free Neon database can sleep between sessions.
+      maximum-pool-size: 5
+      minimum-idle: 0
+      idle-timeout: 60000
+</script>
+<script type="text/plain" id="c-codec">
+class EventCodec(private val mapper: ObjectMapper) {
+    private val types = Event::class.sealedSubclasses.associateBy { it.simpleName!! }
+    fun typeOf(event: Event): String = event::class.simpleName!!
+    fun encode(event: Event): String = mapper.writeValueAsString(event)
+    fun decode(type: String, json: String): Event {
+        val kClass = types[type] ?: throw IllegalStateException("Unknown event type $type")
+        return mapper.readValue(json, kClass.java)
+    }
+}
+</script>
+<script type="text/plain" id="m1">
+-- V1__init.sql (abridged: the full file is 92 lines)
+create table campaign (
+    id            uuid primary key default gen_random_uuid(),
+    name          text        not null,
+    join_code     text        not null unique,
+    dm_token_hash text        not null,
+    created_at    timestamptz not null default now()
+);
+create table character (
+    id           uuid primary key default gen_random_uuid(),
+    campaign_id  uuid not null references campaign (id) on delete cascade,
+    player_id    uuid unique references player (id) on delete set null,
+    name         text not null,
+    portrait_key text, -- object-storage key; null shows initials
+    ac           int  not null check (ac >= 0),
+    max_hp       int  not null check (max_hp > 0),
+    current_hp   int  not null check (current_hp >= 0)
+);
+-- … player, monster_template, encounter, encounter_party, encounter_enemy …
+create table encounter_event (
+    encounter_id uuid        not null references encounter (id) on delete cascade,
+    seq          bigint      not null,
+    batch        bigint      not null,
+    actor_role   text        not null check (actor_role in ('DM', 'PLAYER')),
+    actor_id     uuid,
+    type         text        not null,
+    payload      jsonb       not null,
+    undone       boolean     not null default false,
+    created_at   timestamptz not null default now(),
+    primary key (encounter_id, seq)
+);
+</script>
+<script type="text/plain" id="m2">
+-- V2__encounter_lifecycle.sql
+-- Start combat writes the roster as the fight's first batch. Undo must not go back past it, or the tracker
+-- would be emptied while the encounter is already under way. Batches up to this number can't be undone.
+alter table encounter add column locked_batch bigint not null default 0;
+</script>
+<script type="text/plain" id="m3">
+-- V3__portraits_in_postgres.sql
+-- Portraits are 256 x 256 JPEGs of a few KB, so they live in Postgres: no separate storage service, and
+-- they're in every backup. The free web host's disk is wiped on each restart, so a local folder won't do.
+create table portrait (
+    key        text primary key, -- <campaign id>/<random>.jpg
+    bytes      bytea       not null,
+    created_at timestamptz not null default now()
+);
+</script>
+<script type="text/plain" id="m4">
+-- V4__dm_devices.sql
+create table dm_device (
+    id          uuid primary key default gen_random_uuid(),
+    campaign_id uuid        not null references campaign (id) on delete cascade,
+    token_hash  text        not null unique,
+    created_at  timestamptz not null default now()
+);
+create index dm_device_campaign_idx on dm_device (campaign_id);
+insert into dm_device (campaign_id, token_hash) select id, dm_token_hash from campaign;
+
+alter table campaign add column dm_link_hash text unique;
+
+-- No longer read; kept so the column's NOT NULL insert in older code paths can't fail.
+alter table campaign alter column dm_token_hash drop not null;
+</script>
+<script type="text/plain" id="m5">
+-- V5__npcs.sql
+create table npc (
+    id            uuid primary key default gen_random_uuid(),
+    campaign_id   uuid        not null references campaign (id) on delete cascade,
+    name          text        not null,
+    portrait_key  text,
+    ac            int         not null check (ac >= 0),
+    max_hp        int         not null check (max_hp > 0),
+    current_hp    int         not null check (current_hp >= 0),
+    stats_visible boolean     not null default false,
+    created_at    timestamptz not null default now()
+);
+create index npc_campaign_idx on npc (campaign_id);
+
+create table encounter_npc (
+    encounter_id uuid    not null references encounter (id) on delete cascade,
+    npc_id       uuid    not null references npc (id) on delete cascade,
+    hidden       boolean not null default false,
+    sort_order   int     not null default 0,
+    primary key (encounter_id, npc_id)
+);
+</script>
+<script type="text/plain" id="m6">
+-- V6__dndbeyond_links.sql
+-- A link to the character's D&D Beyond sheet, opened in a new tab. Nothing is fetched from D&D Beyond.
+alter table character add column dndbeyond_url text;
+</script>
+
+<script src="guide.js"></script>
+<script>
+{
+  const { esc, renderCode, bindGlossary, store } = window.Guide
+  const $ = (id) => document.getElementById(id)
+
+  /* ---------- the schema, version by version ----------
+     cols: [name, type, note, addedInVersion?]; fks: [column, table, on delete]; v: version the table appeared */
+  const T = {
+    campaign: { g: 'People', v: 1, why: 'One per group: its name and join code, and (since V4) the DM sign-in link’s hash.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['name', 'text', 'not null'], ['join_code', 'text', 'unique: the code in the join link'], ['dm_token_hash', 'text', 'the first DM device; unused since V4, optional since V4'], ['created_at', 'timestamptz', ''], ['dm_link_hash', 'text', 'unique; hash of the DM sign-in link', 4]], fks: [] },
+    player: { g: 'People', v: 1, why: 'Everyone who joined: their name, the hash of their browser’s secret, and whether the DM let them in.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['display_name', 'text', ''], ['token_hash', 'text', 'hash of the browser’s cookie; null once removed'], ['status', 'text', 'PENDING, APPROVED or REMOVED'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
+    dm_device: { g: 'People', v: 4, why: 'One row per browser signed in as the DM. Signing one out deletes its row.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['token_hash', 'text', 'unique; hash of that browser’s cookie'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
+    character: { g: 'People', v: 1, why: 'The party’s characters. HP lives here so it carries over between fights; a player claims one by filling player_id.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['player_id', 'uuid', 'unique: one character per player'], ['name', 'text', ''], ['portrait_key', 'text', 'points at portrait.key (not enforced)'], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['dndbeyond_url', 'text', 'optional sheet link', 6]], fks: [['campaign_id', 'campaign', 'cascade'], ['player_id', 'player', 'set null']] },
+    npc: { g: 'People', v: 5, why: 'The DM’s other people. Like characters, their HP carries over; stats_visible decides whether players see AC and HP.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['name', 'text', ''], ['portrait_key', 'text', ''], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['stats_visible', 'boolean', 'default false'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
+    monster_template: { g: 'Fight setup', v: 1, why: 'Reusable monsters. Adding enemies copies their name, AC, HP and portrait.', code: 'campaign/CampaignRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed (see Honest gaps)'], ['name', 'text', ''], ['portrait_key', 'text', ''], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0']], fks: [['campaign_id', 'campaign', 'cascade']] },
+    encounter: { g: 'Fight setup', v: 1, why: 'One fight: its status from PREPARING to ENDED, and its version, which every command and undo bumps.', code: 'encounter/app/EncounterRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed (see Honest gaps)'], ['name', 'text', ''], ['status', 'text', 'PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED'], ['version', 'bigint', 'for 409s'], ['created_at', 'timestamptz', ''], ['locked_batch', 'bigint', 'undo stops here', 2]], fks: [['campaign_id', 'campaign', 'cascade']] },
+    encounter_party: { g: 'Fight setup', v: 1, why: 'Who from the party is in a saved fight. No row means “included”, so new characters are in by default.', code: 'encounter/prep/PrepRepository.kt',
+      cols: [['encounter_id', 'uuid', 'primary key (with character_id)'], ['character_id', 'uuid', ''], ['included', 'boolean', 'default true']], fks: [['encounter_id', 'encounter', 'cascade'], ['character_id', 'character', 'cascade']] },
+    encounter_enemy: { g: 'Fight setup', v: 1, why: 'Which monsters a saved fight has, how many, and whether they start hidden.', code: 'encounter/prep/PrepRepository.kt',
+      cols: [['id', 'uuid', 'primary key'], ['encounter_id', 'uuid', 'indexed'], ['monster_template_id', 'uuid', ''], ['count', 'int', 'check 1 to 20'], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['monster_template_id', 'monster_template', 'cascade']] },
+    encounter_npc: { g: 'Fight setup', v: 5, why: 'NPCs in a saved fight. Opt-in: a row means the NPC is in.', code: 'encounter/prep/PrepRepository.kt',
+      cols: [['encounter_id', 'uuid', 'primary key (with npc_id)'], ['npc_id', 'uuid', ''], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['npc_id', 'npc', 'cascade']] },
+    encounter_event: { g: 'The fight', v: 1, why: 'The fight itself, as events. Append-only: undo marks rows undone instead of deleting them. The current tracker is these rows replayed in order.', code: 'encounter/app/EncounterRepository.kt',
+      cols: [['encounter_id', 'uuid', 'primary key (with seq)'], ['seq', 'bigint', 'order within the fight'], ['batch', 'bigint', 'one per command; indexed'], ['actor_role', 'text', 'DM or PLAYER'], ['actor_id', 'uuid', 'which player, if any'], ['type', 'text', 'the event class name'], ['payload', 'jsonb', 'the event’s fields'], ['undone', 'boolean', 'default false'], ['created_at', 'timestamptz', '']], fks: [['encounter_id', 'encounter', 'cascade']] },
+    portrait: { g: 'Files', v: 3, why: 'Portrait JPEGs, 256 × 256, a few KB each. The key starts with the campaign id, which is how a portrait is tied to its campaign.', code: 'portrait/Portraits.kt',
+      cols: [['key', 'text', 'primary key: <campaign>/<random>.jpg'], ['bytes', 'bytea', 'the JPEG'], ['created_at', 'timestamptz', '']], fks: [] },
+  }
+  const MIG = [
+    { v: 1, file: 'V1__init.sql', title: 'The first schema', note: 'Eight tables for campaigns, players, characters, monsters and fights, with the event log from day one.', added: ['campaign', 'player', 'character', 'monster_template', 'encounter', 'encounter_party', 'encounter_enemy', 'encounter_event'], changed: [] },
+    { v: 2, file: 'V2__encounter_lifecycle.sql', title: 'Start combat can’t be undone', note: 'Prep and initiative arrived. Undo must not remove the roster that Start combat wrote, so encounters remember which batches are locked. Added with a default, so existing fights get 0.', added: [], changed: ['encounter'] },
+    { v: 3, file: 'V3__portraits_in_postgres.sql', title: 'Portraits move into Postgres', note: 'For free hosting, whose disk is wiped on every restart. Portraits had been saved as files; now they’re rows, and they’re in every backup.', added: ['portrait'], changed: [] },
+    { v: 4, file: 'V4__dm_devices.sql', title: 'The DM on several devices', note: 'One row per DM browser instead of one hash on the campaign. Existing DMs were copied over in the same migration, so nobody was signed out. The old column is relaxed, not dropped.', added: ['dm_device'], changed: ['campaign'] },
+    { v: 5, file: 'V5__npcs.sql', title: 'NPCs', note: 'A new kind of person with HP that carries over, and a table for which NPCs are in a saved fight.', added: ['npc', 'encounter_npc'], changed: [] },
+    { v: 6, file: 'V6__dndbeyond_links.sql', title: 'D&D Beyond links', note: 'One optional column. Existing characters simply have no link.', added: [], changed: ['character'] },
+  ]
+
+  let ver = 6
+  let sel = store.get('cdnd-guide-ch1-table', 'encounter_event')
+  if (!T[sel]) sel = 'encounter_event'
+  const groups = ['People', 'Fight setup', 'The fight', 'Files']
+  const related = (name) => {
+    const out = new Set(T[name].fks.map((f) => f[1]))
+    for (const [k, t] of Object.entries(T)) if (t.fks.some((f) => f[1] === name)) out.add(k)
+    return out
+  }
+  const drawSchema = () => {
+    const m = MIG[ver - 1]
+    const rel = related(sel)
+    $('schema').innerHTML = groups.map((g) => `<div class="grp"><span>${g}</span>${Object.entries(T).filter(([, t]) => t.g === g).map(([name, t]) => {
+      const exists = t.v <= ver
+      const cls = !exists ? 'absent' : m.added.includes(name) ? 'new' : m.changed.includes(name) ? 'changed' : rel.has(name) ? 'related' : ''
+      const badge = cls === 'new' ? '<span class="badge">new</span>' : cls === 'changed' ? '<span class="badge">changed</span>' : ''
+      const cols = t.cols.filter((c) => (c[3] || 1) <= ver).map((c) => c[0]).join(', ')
+      return `<button type="button" class="tbl ${cls}" data-t="${name}" aria-pressed="${name === sel}"${exists ? '' : ` title="Arrives in V${t.v}"`}><b>${badge}${esc(name)}</b><span class="cols">${esc(cols)}</span></button>`
+    }).join('')}</div>`).join('')
+    $('schema').querySelectorAll('.tbl').forEach((b) => b.addEventListener('click', () => { sel = b.dataset.t; store.set('cdnd-guide-ch1-table', sel); drawSchema(); drawTable() }))
+  }
+  const drawTable = () => {
+    const t = T[sel]
+    if (t.v > ver) {
+      $('tDetail').innerHTML = `<h3>${esc(sel)}</h3><p>This table arrives in <b>V${t.v}</b>. Move the slider to V${t.v} or later to look inside.</p>`
+      return
+    }
+    const rows = t.cols.filter((c) => (c[3] || 1) <= ver).map((c) => `<tr class="${c[3] === ver ? 'addedrow' : ''}"><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(c[2])}</td></tr>`).join('')
+    const fks = t.fks.filter((f) => T[f[1]].v <= ver).map((f) => `<li><code>${esc(f[0])}</code> → <b>${esc(f[1])}</b> · on delete <b>${f[2] === 'cascade' ? 'cascade' : 'set null'}</b>: ${f[2] === 'cascade' ? `deleting the ${esc(f[1].replace('_', ' '))} deletes these rows too` : `deleting the ${esc(f[1])} just empties this column`}</li>`).join('')
+    const into = Object.entries(T).filter(([k, x]) => x.v <= ver && x.fks.some((f) => f[1] === sel)).map(([k]) => `<code>${esc(k)}</code>`).join(', ')
+    $('tDetail').innerHTML = `<h3>${esc(sel)} <span class="small muted" style="font-family: var(--text)">· since V${t.v}</span></h3><p class="small">${esc(t.why)}</p>
+      <div class="scroll"><table class="cols-table"><thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${fks ? `<h3 style="margin-top: 14px; font-size: 16px">Points to</h3><ul class="rel">${fks}</ul>` : ''}
+      ${into ? `<p class="small" style="margin: 10px 0 0">Pointed to by ${into}.</p>` : ''}
+      <p class="small muted" style="margin: 10px 0 0">Read and written in <a href="https://github.com/shawn-kg/combat-dnd/blob/main/backend/src/main/kotlin/app/combatdnd/${esc(t.code)}" target="_blank" rel="noopener">${esc(t.code)} ↗</a></p>`
+  }
+  const drawVersion = () => {
+    const m = MIG[ver - 1]
+    $('vLabel').textContent = `V${ver}`
+    $('vRange').value = String(ver)
+    $('vTicks').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === ver)))
+    $('vNote').innerHTML = `<h3>V${m.v} · ${esc(m.title)}</h3><p class="small" style="margin:0">${esc(m.note)}</p>`
+    const fig = $('vSql')
+    fig.replaceChildren()
+    fig.dataset.src = `m${ver}`
+    fig.dataset.file = `backend/src/main/resources/db/migration/${m.file}`
+    renderCode(fig)
+    drawSchema()
+    drawTable()
+  }
+  $('vTicks').innerHTML = MIG.map((m) => `<button type="button" data-v="${m.v}" aria-pressed="false" title="${esc(m.title)}">V${m.v}</button>`).join('')
+  $('vTicks').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { ver = Number(b.dataset.v); drawVersion() }))
+  $('vRange').addEventListener('input', (e) => { ver = Number(e.target.value); drawVersion() })
+  drawVersion()
+
+  /* ---------- try to break it ---------- */
+  const BREAK = [
+    ['Negative HP', "update character set current_hp = -1\nwhere name = 'Thorin';", 'ERROR:  new row for relation "character" violates check constraint "character_current_hp_check"\nDETAIL:  Failing row contains (…, Thorin, …, -1, …).',
+      'The <code>check (current_hp &gt;= 0)</code> from V1. The app never sends this (damage stops at 0 in <code>evolve</code>), so the check is a safety net for bugs and for anyone poking at the database by hand.', false],
+    ['25 goblins', "insert into encounter_enemy (encounter_id, monster_template_id, count)\nvalues ('…', '…', 25);", 'ERROR:  new row for relation "encounter_enemy" violates check constraint "encounter_enemy_count_check"',
+      '<code>check (count between 1 and 20)</code>. The prep screen’s − / + stops at 20 and the server checks it too; the database is the third line.', false],
+    ['Two characters for one player', "update character set player_id = '<Sam>' where name = 'Bram';\n-- Sam already has Lyra", 'ERROR:  duplicate key value violates unique constraint "character_player_id_key"\nDETAIL:  Key (player_id)=(…) already exists.',
+      '<code>player_id uuid unique</code>: one character per player, guaranteed even if two requests race. The app checks first and says “You’ve already chosen your character”, but this is what makes it impossible.', false],
+    ['Two players, one character', "-- both run at the same instant\nupdate character set player_id = '<Sam>' where id = '<Lyra>' and player_id is null;\nupdate character set player_id = '<Ana>' where id = '<Lyra>' and player_id is null;", 'UPDATE 1   -- Sam got there first\nUPDATE 0   -- Ana: player_id is no longer null',
+      'No error at all: the condition does the work. Postgres applies the updates one at a time, so the second sees Sam’s id and matches no rows. The app turns that 0 into “Someone else just chose that character. Pick another.”', true],
+    ['An event for no fight', "insert into encounter_event (encounter_id, seq, batch, actor_role, type, payload)\nvalues ('00000000-0000-0000-0000-000000000000', 1, 1, 'DM', 'TurnChanged', '{}');", 'ERROR:  insert or update on table "encounter_event" violates foreign key constraint "encounter_event_encounter_id_fkey"\nDETAIL:  Key (encounter_id)=(00000000-…) is not present in table "encounter".',
+      'The foreign key: every event must belong to a real encounter. Orphan rows can’t exist.', false],
+    ['Delete a whole campaign', "delete from campaign where name = 'Tuesday Group';", 'DELETE 1\n-- and, automatically: its players, DM devices, characters, NPCs, monsters,\n-- encounters, their rosters and every event of every fight',
+      '<code>on delete cascade</code> on every table that points at <code>campaign</code> (and at <code>encounter</code>). One statement removes everything that belonged to it, so nothing is left behind. Portraits are the exception: their keys aren’t foreign keys (see Honest gaps).', true],
+    ['A campaign with no name', "insert into campaign (join_code) values ('ABC234');", 'ERROR:  null value in column "name" of relation "campaign" violates not-null constraint',
+      '<code>not null</code>. The app trims the name and refuses an empty one before it gets here.', false],
+  ]
+  const breaks = $('breaks')
+  breaks.innerHTML = BREAK.map(([t], i) => `<button type="button" data-i="${i}" aria-pressed="false">${esc(t)}</button>`).join('')
+  const pickBreak = (i) => {
+    const [, sql, out, why, ok] = BREAK[i]
+    breaks.querySelectorAll('button').forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)))
+    $('bSql').textContent = sql
+    $('bOut').className = ok ? 'err ok' : 'err'
+    $('bOut').textContent = out
+    $('bWhy').innerHTML = `<p style="margin:0">${why}</p>`
+  }
+  breaks.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => pickBreak(Number(b.dataset.i))))
+  pickBreak(0)
+
+  /* ---------- hashing demo (Web Crypto, like Session.newToken and Session.hash) ---------- */
+  const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  let token = ''
+  const showHash = async () => {
+    $('hTok').textContent = token
+    if (!window.crypto?.subtle) { $('hHash').textContent = 'This browser won’t compute hashes on this page. Try the terminal exercise below instead.'; return }
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))
+    $('hHash').textContent = [...digest].map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  $('hNew').addEventListener('click', () => { token = b64url(crypto.getRandomValues(new Uint8Array(32))); showHash() })
+  $('hEdit').addEventListener('click', () => {
+    const i = Math.floor(token.length / 2)
+    token = token.slice(0, i) + (token[i] === 'A' ? 'B' : 'A') + token.slice(i + 1)
+    showHash()
+  })
+  token = b64url(crypto.getRandomValues(new Uint8Array(32)))
+  showHash()
+  bindGlossary(document)
+}
+</script>
+</body>
+</html>
