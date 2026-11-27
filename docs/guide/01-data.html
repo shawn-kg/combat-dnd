@@ -215,10 +215,10 @@
       <p><b>A foreign key</b> is a column holding another row’s id, plus a rule Postgres enforces: that row must exist. <code>character.campaign_id</code> must name a real campaign. It also says what happens when the target is deleted: <b>cascade</b> (delete these rows too), <b>set null</b> (keep them, empty the link), or the default, <b>restrict</b> (refuse the delete while anything still points at it).</p>
     </div>
     <div class="panel">
-      <h3>How many rows does Postgres look at?</h3>
-      <p class="small muted">Finding one campaign’s encounters, as the table grows. Drag the slider.</p>
+      <h3>How much does Postgres read?</h3>
+      <p class="small muted">Finding one campaign’s encounters as the table grows. The table keeps every row either way: the index doesn’t shrink it, it changes how much Postgres has to read to answer the question. Drag the slider.</p>
       <input type="range" id="ixRange" min="1" max="7" step="1" value="3" aria-label="Rows in the encounter table" style="width: 100%; accent-color: var(--gold)">
-      <p style="margin: 6px 0 12px">Table size: <b id="ixRows" class="num"></b> encounters</p>
+      <p style="margin: 6px 0 12px">Rows in the table: <b id="ixRows" class="num"></b> encounters <span class="small muted">(the same with or without an index)</span></p>
       <div id="ixBars"></div>
       <p class="small muted" id="ixNote" style="margin: 10px 0 0"></p>
     </div>
@@ -702,10 +702,10 @@ alter table character add column dndbeyond_url text;
     const fmt = (x) => x.toLocaleString('en-US')
     $('ixRows').textContent = fmt(n)
     const bar = (label, v, color) => `<div style="margin: 0 0 10px"><div class="small" style="display:flex;justify-content:space-between;gap:8px"><span>${label}</span><b class="num">${fmt(v)}</b></div><div style="height:10px;border-radius:5px;background:var(--code-bg);border:1px solid var(--border);overflow:hidden"><i style="display:block;height:100%;width:${Math.max(0.6, (Math.log10(v) / Math.log10(SIZES[6])) * 100)}%;background:${color}"></i></div></div>`
-    $('ixBars').innerHTML = bar('Without an index (every row)', n, 'var(--enemy)') + bar(`With an index (${depth} tree steps + ${matches} matches)`, withIx, 'var(--ok)')
+    $('ixBars').innerHTML = bar('Read without an index: every row', n, 'var(--enemy)') + bar(`Read with an index: ${depth} steps down the index + ${matches} matching rows`, withIx, 'var(--ok)')
     $('ixNote').textContent = n <= 1000
       ? 'At this size Postgres may skip the index anyway: reading a few pages directly is just as cheap.'
-      : `About ${fmt(Math.round(n / withIx))} times less work. Bars use a log scale; without one the green bar would be invisible.`
+      : `About ${fmt(Math.round(n / withIx))} times less reading. The index itself is extra storage: a sorted copy of every campaign_id with a pointer to its row. Bars use a log scale; without one the green bar would be invisible.`
   }
   $('ixRange').addEventListener('input', drawIx)
   drawIx()
