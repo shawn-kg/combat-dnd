@@ -1,7 +1,11 @@
 package app.combatdnd.encounter.domain
 
-/** One line of a fight's story. `turn` lines start a turn; the rest sit under the turn they happened in. */
-data class TranscriptLine(val round: Int, val text: String, val turn: Boolean = false)
+/**
+ * One line of a fight's story. `turn` lines start a turn; the rest sit under the turn they happened in.
+ * `notes` are later changes to this line's attack (corrections, removal), kept beside it rather than
+ * further down the story, e.g. "corrected in round 3: hit, 6 damage (Goblin 1 1/7)".
+ */
+data class TranscriptLine(val round: Int, val text: String, val turn: Boolean = false, val notes: List<String> = emptyList())
 
 /** One attack as it finally stands (corrections applied, deleted ones gone), with the target's HP right after it. */
 data class TranscriptAttack(
@@ -19,13 +23,19 @@ data class Transcript(val lines: List<TranscriptLine>, val attacks: List<Transcr
 
 /**
  * Replays a fight's events (undone ones already left out) and writes down what each one did, in plain words,
- * with HP as it was at that moment. This is the history, so corrections show up as corrections. Setup before
- * round 1 (adding combatants, rolling initiative) is summed up as the starting order instead of line by line.
+ * with HP as it was at that moment. This is the history: an attack's line stays as it was logged, and any
+ * later correction or removal is attached to it as a note (with the round it happened in and HP right after).
+ * Setup before round 1 (adding combatants, rolling initiative) is summed up as the starting order.
  */
 fun transcript(events: List<Event>): Transcript {
     var state = EncounterState(round = 0, order = emptyList(), currentId = null, combatants = emptyMap())
     val lines = mutableListOf<TranscriptLine>()
     val attacks = linkedMapOf<AttackId, TranscriptAttack>()
+    val lineOf = mutableMapOf<AttackId, Int>() // where each attack's line is, so changes can be noted beside it
+    fun note(id: AttackId, text: String) {
+        val i = lineOf[id] ?: return
+        lines[i] = lines[i].copy(notes = lines[i].notes + text)
+    }
 
     for (event in events) {
         val before = state
@@ -50,6 +60,7 @@ fun transcript(events: List<Event>): Transcript {
             is Event.AttackLogged -> {
                 val target = after.combatant(event.targetId)
                 line("${name(event.attackerId)} → ${target.name}: ${result(event.hit, event.damage)} (${target.name} ${hpOf(after, target.id)})")
+                lineOf[event.id] = lines.lastIndex
                 attacks[event.id] = TranscriptAttack(
                     event.round, name(event.attackerId), target.name, event.hit, event.damage, target.hp, target.maxHp, corrected = false,
                 )
@@ -58,7 +69,7 @@ fun transcript(events: List<Event>): Transcript {
             is Event.AttackEdited -> {
                 val entry = before.attack(event.id)!!
                 val t = name(entry.targetId)
-                line("Correction: ${name(entry.attackerId)} → $t is now ${result(event.hit, event.damage)} ($t ${hpOf(after, entry.targetId)})")
+                note(event.id, "corrected in round ${after.round}: ${result(event.hit, event.damage)} ($t ${hpOf(after, entry.targetId)})")
                 attacks[event.id]?.let { a ->
                     val target = after.combatants[entry.targetId]
                     attacks[event.id] = a.copy(
@@ -69,8 +80,7 @@ fun transcript(events: List<Event>): Transcript {
             }
 
             is Event.AttackDeleted -> {
-                val entry = before.attack(event.id)!!
-                line("Entry removed: ${name(entry.attackerId)} → ${name(entry.targetId)} (${result(entry.hit, entry.damage)})")
+                note(event.id, "removed in round ${after.round}")
                 attacks.remove(event.id)
             }
 
