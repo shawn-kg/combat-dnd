@@ -99,11 +99,11 @@
 <section class="band">
   <div class="wrap">
     <h1>Data: Postgres and migrations</h1>
-    <p class="lead">Everything that has to survive a restart lives in 12 tables in one Postgres database. They weren’t designed in one go: six migration files built them up as features arrived. Drag the slider to replay that history, and click any table to look inside.</p>
+    <p class="lead">Everything that has to survive a restart lives in 12 tables in one Postgres database. They weren’t designed in one go: seven migration files built them up as features arrived, and the seventh fixed what a review turned up. Drag the slider to replay that history, and click any table to look inside.</p>
 
     <div class="ver">
-      <span class="vlabel" id="vLabel">V6</span>
-      <input type="range" id="vRange" min="1" max="6" step="1" value="6" aria-label="Schema version">
+      <span class="vlabel" id="vLabel">V7</span>
+      <input type="range" id="vRange" min="1" max="7" step="1" value="7" aria-label="Schema version">
       <div class="ticks" id="vTicks" role="group" aria-label="Migrations"></div>
     </div>
     <div class="schema" id="schema"></div>
@@ -204,6 +204,27 @@
   </div>
 </section>
 
+<!-- ======================= 4b. indexes and foreign keys ======================= -->
+<section class="band">
+  <div class="wrap split">
+    <div class="read">
+      <h2>Two building blocks: indexes and foreign keys</h2>
+      <p><b>An index</b> is a sorted lookup structure kept beside a table, like the index at the back of a book. Without one, “every encounter in campaign X” means checking every row (a <b>sequential scan</b>). With one, Postgres walks a shallow sorted tree (a <b>B-tree</b>) straight to the matching rows.</p>
+      <p>Indexes aren’t free: every insert or update also updates each index on the table, and they take disk space. So you add them for lookups you actually make. Postgres builds one automatically for every primary key and unique constraint. It does <b>not</b> build one for a foreign-key column, which is why V7 had to add three.</p>
+      <p><b>A multi-column index works for its first column on its own.</b> <code>(encounter_id, seq)</code> also finds “where encounter_id = …” fast, but not “where seq = …”: like a phone book sorted by last name, then first name.</p>
+      <p><b>A foreign key</b> is a column holding another row’s id, plus a rule Postgres enforces: that row must exist. <code>character.campaign_id</code> must name a real campaign. It also says what happens when the target is deleted: <b>cascade</b> (delete these rows too), <b>set null</b> (keep them, empty the link), or the default, <b>restrict</b> (refuse the delete while anything still points at it).</p>
+    </div>
+    <div class="panel">
+      <h3>How many rows does Postgres look at?</h3>
+      <p class="small muted">Finding one campaign’s encounters, as the table grows. Drag the slider.</p>
+      <input type="range" id="ixRange" min="1" max="7" step="1" value="3" aria-label="Rows in the encounter table" style="width: 100%; accent-color: var(--gold)">
+      <p style="margin: 6px 0 12px">Table size: <b id="ixRows" class="num"></b> encounters</p>
+      <div id="ixBars"></div>
+      <p class="small muted" id="ixNote" style="margin: 10px 0 0"></p>
+    </div>
+  </div>
+</section>
+
 <!-- ======================= 5. try to break it ======================= -->
 <section class="band">
   <div class="wrap">
@@ -295,14 +316,15 @@
 <!-- ======================= 8. gaps ======================= -->
 <section class="band">
   <div class="wrap">
-    <h2>Honest gaps</h2>
-    <p class="lead">Things a reviewer would point out. None of them matter for one group today; each is a good small exercise.</p>
-    <div class="ideas" style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16em), 1fr))">
-      <div class="panel"><b>Two missing indexes</b><p class="small" style="margin:6px 0 0"><code>encounter</code> and <code>monster_template</code> are looked up by <code>campaign_id</code> but have no index on it, unlike the other tables. With hundreds of rows Postgres scans them in microseconds; with millions it would matter.</p></div>
-      <div class="panel"><b>A leftover column</b><p class="small" style="margin:6px 0 0"><code>campaign.dm_token_hash</code> stopped being read in V4. The “contract” half of expand/contract (dropping it) hasn’t happened yet.</p></div>
-      <div class="panel"><b>Portrait keys aren’t foreign keys</b><p class="small" style="margin:6px 0 0"><code>portrait_key</code> columns aren’t linked to <code>portrait.key</code>, so the database won’t stop a dangling key. The code checks it instead, and deleting a character doesn’t delete its picture.</p></div>
-      <div class="panel"><b>A stale comment</b><p class="small" style="margin:6px 0 0">V1 still says <code>portrait_key</code> is an “object-storage key”. Portraits moved into Postgres in V3. Old migrations can’t be edited, so old comments stay as they were.</p></div>
+    <h2>Fixed in V7</h2>
+    <p class="lead">This chapter used to end with four gaps a reviewer would point out. One migration, <code>V7__tidy_up.sql</code>, fixed them all. Move the slider above between V6 and V7 to see each change.</p>
+    <div style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16em), 1fr))">
+      <div class="panel"><b>Missing indexes</b><p class="small" style="margin:6px 0 0"><code>encounter</code> and <code>monster_template</code> were looked up by <code>campaign_id</code> with no index. Writing the fix turned up three more: foreign-key columns that cascading deletes have to search (<code>encounter_party.character_id</code>, <code>encounter_enemy.monster_template_id</code>, <code>encounter_npc.npc_id</code>). Five indexes now.</p></div>
+      <div class="panel"><b>The leftover column</b><p class="small" style="margin:6px 0 0"><code>campaign.dm_token_hash</code> is dropped: the “contract” half of what V4 started. Safe during a deploy, because the previous version hadn’t used it since V4 either.</p></div>
+      <div class="panel"><b>Portrait links</b><p class="small" style="margin:6px 0 0">Every <code>portrait_key</code> is now a real foreign key, and each portrait belongs to its campaign, so deleting a campaign deletes its pictures. Keys that pointed at nothing were cleared first, or adding the constraint would have failed on old local databases.</p></div>
+      <div class="panel"><b>The stale comment</b><p class="small" style="margin:6px 0 0">V1 can’t be edited (its checksum is recorded), so the correct description now lives in the database: <code>comment on column character.portrait_key is '…'</code>. See it with <code>\d+ character</code>.</p></div>
     </div>
+    <div class="note" style="margin-top: 16px"><b>Expand and contract, again.</b> V7 gives <code>portrait.campaign_id</code> a value for every existing picture, but leaves the column optional. During a deploy the old version keeps serving for a minute while the new one starts, and the old code saves portraits without a campaign. If the column were required, an upload in that minute would fail. A later migration can make it required once only new code is running.</div>
   </div>
 </section>
 
@@ -325,6 +347,9 @@
         <div class="cmd"><pre>select c.name, d.created_at from dm_device d join campaign c on c.id = d.campaign_id where d.token_hash = 'PASTE-THE-HASH';</pre><button class="btn" data-copy type="button">Copy</button></div></li>
       <li><label><input type="checkbox"> Watch undo in the table</label><p class="small muted">Log an attack in the dev fight as the DM, press Undo, then look at the newest rows: the attack is still there, with <code>undone = t</code>.</p>
         <div class="cmd"><pre>select seq, batch, type, undone from encounter_event order by created_at desc limit 4;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
+      <li><label><input type="checkbox"> See V7’s fixes</label><p class="small muted">The corrected description and the new foreign key show up in the table’s details, and the old DM column is gone from <code>campaign</code>.</p>
+        <div class="cmd"><pre>\d+ character
+\d campaign</pre><button class="btn" data-copy type="button">Copy</button></div></li>
       <li><label><input type="checkbox"> See an index at work</label><p class="small muted">Ask Postgres how it would replay the dev fight. Look for an index scan on one of the two indexes that start with <code>encounter_id</code>: in testing it was <code>Bitmap Index Scan on encounter_event_batch_idx</code>, followed by a <code>Sort</code> on <code>seq</code>. The planner picks whichever looks cheapest, and on a tiny table it may even read every row directly.</p>
         <div class="cmd"><pre>explain select type, payload from encounter_event where encounter_id = '00000000-0000-4000-8000-0000000000a1' and not undone order by seq;</pre><button class="btn" data-copy type="button">Copy</button></div></li>
     </ul>
@@ -345,6 +370,9 @@
       <div class="q" data-answer="0"><p>Two players click the same character at the same instant. What makes sure only one gets it?</p>
         <div class="opts"><button>The update only applies <code>where player_id is null</code>, so the second one changes 0 rows</button><button>A lock in the Kotlin code</button><button>Nothing: whoever is second overwrites the first</button></div>
         <div class="explain" hidden><b></b>Postgres applies the two updates one after the other; the condition is checked against the latest data. The unique constraint on <code>player_id</code> is a second safety net.</div></div>
+      <div class="q" data-answer="1"><p>You add a column that points at another table, like <code>encounter_enemy.monster_template_id</code>. What does Postgres give you automatically?</p>
+        <div class="opts"><button>A foreign key and an index</button><button>Only what you write: declare the foreign key yourself, and add an index if you’ll search or cascade by it</button><button>An index, but no foreign key</button></div>
+        <div class="explain" hidden><b></b>Postgres indexes primary keys and unique columns by itself, nothing else. Without an index on that column, deleting a monster means reading every <code>encounter_enemy</code> row to find the ones to cascade. That’s one of the gaps V7 fixed.</div></div>
       <div class="q" data-answer="2"><p>Why can’t the <code>AttackLogged</code> event class simply be renamed?</p>
         <div class="opts"><button>Kotlin doesn’t allow renaming sealed classes</button><button>It would break the frontend</button><button>Saved events store the class name as their type, so old fights couldn’t be read back</button></div>
         <div class="explain" hidden><b></b>The <code>type</code> column says <code>AttackLogged</code> for every attack ever logged. A rename needs a mapping from old names (or a migration that rewrites the column).</div></div>
@@ -485,6 +513,27 @@ create table encounter_npc (
     primary key (encounter_id, npc_id)
 );
 </script>
+<script type="text/plain" id="m7">
+-- V7__tidy_up.sql (abridged: the full file explains each step)
+create index encounter_campaign_idx on encounter (campaign_id);
+create index monster_template_campaign_idx on monster_template (campaign_id);
+create index encounter_party_character_idx on encounter_party (character_id);
+create index encounter_enemy_template_idx on encounter_enemy (monster_template_id);
+create index encounter_npc_npc_idx on encounter_npc (npc_id);
+
+alter table campaign drop column dm_token_hash;
+
+delete from portrait p where not exists (select 1 from campaign c where c.id::text = split_part(p.key, '/', 1));
+alter table portrait add column campaign_id uuid;           -- optional for now: expand, then contract
+update portrait set campaign_id = split_part(key, '/', 1)::uuid;
+alter table portrait add constraint portrait_campaign_id_fkey foreign key (campaign_id) references campaign (id) on delete cascade;
+
+update character set portrait_key = null where portrait_key is not null and not exists (select 1 from portrait p where p.key = portrait_key);
+alter table character add constraint character_portrait_key_fkey foreign key (portrait_key) references portrait (key) on delete set null;
+-- … the same for npc and monster_template …
+
+comment on column character.portrait_key is 'A picture in the portrait table (<campaign id>/<random>.jpg); null shows initials.';
+</script>
 <script type="text/plain" id="m6">
 -- V6__dndbeyond_links.sql
 -- A link to the character's D&D Beyond sheet, opened in a new tab. Nothing is fetched from D&D Beyond.
@@ -498,32 +547,32 @@ alter table character add column dndbeyond_url text;
   const $ = (id) => document.getElementById(id)
 
   /* ---------- the schema, version by version ----------
-     cols: [name, type, note, addedInVersion?]; fks: [column, table, on delete]; v: version the table appeared */
+     cols: [name, type, note, addedIn?, removedIn?, {version: later note}?]; fks: [column, table, on delete, addedIn?]; v: version the table appeared */
   const T = {
     campaign: { g: 'People', v: 1, why: 'One per group: its name and join code, and (since V4) the DM sign-in link’s hash.', code: 'campaign/CampaignRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['name', 'text', 'not null'], ['join_code', 'text', 'unique: the code in the join link'], ['dm_token_hash', 'text', 'the first DM device; unused since V4, optional since V4'], ['created_at', 'timestamptz', ''], ['dm_link_hash', 'text', 'unique; hash of the DM sign-in link', 4]], fks: [] },
+      cols: [['id', 'uuid', 'primary key'], ['name', 'text', 'not null'], ['join_code', 'text', 'unique: the code in the join link'], ['dm_token_hash', 'text', 'the first DM device; unused and optional since V4, dropped in V7', 1, 7], ['created_at', 'timestamptz', ''], ['dm_link_hash', 'text', 'unique; hash of the DM sign-in link', 4]], fks: [] },
     player: { g: 'People', v: 1, why: 'Everyone who joined: their name, the hash of their browser’s secret, and whether the DM let them in.', code: 'campaign/CampaignRepository.kt',
       cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['display_name', 'text', ''], ['token_hash', 'text', 'hash of the browser’s cookie; null once removed'], ['status', 'text', 'PENDING, APPROVED or REMOVED'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
     dm_device: { g: 'People', v: 4, why: 'One row per browser signed in as the DM. Signing one out deletes its row.', code: 'campaign/CampaignRepository.kt',
       cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['token_hash', 'text', 'unique; hash of that browser’s cookie'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
     character: { g: 'People', v: 1, why: 'The party’s characters. HP lives here so it carries over between fights; a player claims one by filling player_id.', code: 'campaign/CampaignRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['player_id', 'uuid', 'unique: one character per player'], ['name', 'text', ''], ['portrait_key', 'text', 'points at portrait.key (not enforced)'], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['dndbeyond_url', 'text', 'optional sheet link', 6]], fks: [['campaign_id', 'campaign', 'cascade'], ['player_id', 'player', 'set null']] },
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['player_id', 'uuid', 'unique: one character per player'], ['name', 'text', ''], ['portrait_key', 'text', 'points at portrait.key (not enforced)', 1, null, {7: 'foreign key to portrait.key since V7'}], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['dndbeyond_url', 'text', 'optional sheet link', 6]], fks: [['campaign_id', 'campaign', 'cascade'], ['player_id', 'player', 'set null'], ['portrait_key', 'portrait', 'set null', 7]] },
     npc: { g: 'People', v: 5, why: 'The DM’s other people. Like characters, their HP carries over; stats_visible decides whether players see AC and HP.', code: 'campaign/CampaignRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['name', 'text', ''], ['portrait_key', 'text', ''], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['stats_visible', 'boolean', 'default false'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade']] },
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'indexed'], ['name', 'text', ''], ['portrait_key', 'text', 'not enforced', 1, null, {7: 'foreign key to portrait.key since V7'}], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0'], ['current_hp', 'int', 'check ≥ 0'], ['stats_visible', 'boolean', 'default false'], ['created_at', 'timestamptz', '']], fks: [['campaign_id', 'campaign', 'cascade'], ['portrait_key', 'portrait', 'set null', 7]] },
     monster_template: { g: 'Fight setup', v: 1, why: 'Reusable monsters. Adding enemies copies their name, AC, HP and portrait.', code: 'campaign/CampaignRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed (see Honest gaps)'], ['name', 'text', ''], ['portrait_key', 'text', ''], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0']], fks: [['campaign_id', 'campaign', 'cascade']] },
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed', 1, null, {7: 'indexed since V7'}], ['name', 'text', ''], ['portrait_key', 'text', 'not enforced', 1, null, {7: 'foreign key to portrait.key since V7'}], ['ac', 'int', 'check ≥ 0'], ['max_hp', 'int', 'check > 0']], fks: [['campaign_id', 'campaign', 'cascade'], ['portrait_key', 'portrait', 'set null', 7]] },
     encounter: { g: 'Fight setup', v: 1, why: 'One fight: its status from PREPARING to ENDED, and its version, which every command and undo bumps.', code: 'encounter/app/EncounterRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed (see Honest gaps)'], ['name', 'text', ''], ['status', 'text', 'PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED'], ['version', 'bigint', 'for 409s'], ['created_at', 'timestamptz', ''], ['locked_batch', 'bigint', 'undo stops here', 2]], fks: [['campaign_id', 'campaign', 'cascade']] },
+      cols: [['id', 'uuid', 'primary key'], ['campaign_id', 'uuid', 'not indexed', 1, null, {7: 'indexed since V7'}], ['name', 'text', ''], ['status', 'text', 'PREPARING, ROLLING_INITIATIVE, ACTIVE, ENDED'], ['version', 'bigint', 'for 409s'], ['created_at', 'timestamptz', ''], ['locked_batch', 'bigint', 'undo stops here', 2]], fks: [['campaign_id', 'campaign', 'cascade']] },
     encounter_party: { g: 'Fight setup', v: 1, why: 'Who from the party is in a saved fight. No row means “included”, so new characters are in by default.', code: 'encounter/prep/PrepRepository.kt',
-      cols: [['encounter_id', 'uuid', 'primary key (with character_id)'], ['character_id', 'uuid', ''], ['included', 'boolean', 'default true']], fks: [['encounter_id', 'encounter', 'cascade'], ['character_id', 'character', 'cascade']] },
+      cols: [['encounter_id', 'uuid', 'primary key (with character_id)'], ['character_id', 'uuid', 'not indexed', 1, null, {7: 'indexed since V7: deleting a character finds its rows fast'}], ['included', 'boolean', 'default true']], fks: [['encounter_id', 'encounter', 'cascade'], ['character_id', 'character', 'cascade']] },
     encounter_enemy: { g: 'Fight setup', v: 1, why: 'Which monsters a saved fight has, how many, and whether they start hidden.', code: 'encounter/prep/PrepRepository.kt',
-      cols: [['id', 'uuid', 'primary key'], ['encounter_id', 'uuid', 'indexed'], ['monster_template_id', 'uuid', ''], ['count', 'int', 'check 1 to 20'], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['monster_template_id', 'monster_template', 'cascade']] },
+      cols: [['id', 'uuid', 'primary key'], ['encounter_id', 'uuid', 'indexed'], ['monster_template_id', 'uuid', 'not indexed', 1, null, {7: 'indexed since V7'}], ['count', 'int', 'check 1 to 20'], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['monster_template_id', 'monster_template', 'cascade']] },
     encounter_npc: { g: 'Fight setup', v: 5, why: 'NPCs in a saved fight. Opt-in: a row means the NPC is in.', code: 'encounter/prep/PrepRepository.kt',
-      cols: [['encounter_id', 'uuid', 'primary key (with npc_id)'], ['npc_id', 'uuid', ''], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['npc_id', 'npc', 'cascade']] },
+      cols: [['encounter_id', 'uuid', 'primary key (with npc_id)'], ['npc_id', 'uuid', 'not indexed', 1, null, {7: 'indexed since V7'}], ['hidden', 'boolean', ''], ['sort_order', 'int', '']], fks: [['encounter_id', 'encounter', 'cascade'], ['npc_id', 'npc', 'cascade']] },
     encounter_event: { g: 'The fight', v: 1, why: 'The fight itself, as events. Append-only: undo marks rows undone instead of deleting them. The current tracker is these rows replayed in order.', code: 'encounter/app/EncounterRepository.kt',
       cols: [['encounter_id', 'uuid', 'primary key (with seq)'], ['seq', 'bigint', 'order within the fight'], ['batch', 'bigint', 'one per command; indexed'], ['actor_role', 'text', 'DM or PLAYER'], ['actor_id', 'uuid', 'which player, if any'], ['type', 'text', 'the event class name'], ['payload', 'jsonb', 'the event’s fields'], ['undone', 'boolean', 'default false'], ['created_at', 'timestamptz', '']], fks: [['encounter_id', 'encounter', 'cascade']] },
-    portrait: { g: 'Files', v: 3, why: 'Portrait JPEGs, 256 × 256, a few KB each. The key starts with the campaign id, which is how a portrait is tied to its campaign.', code: 'portrait/Portraits.kt',
-      cols: [['key', 'text', 'primary key: <campaign>/<random>.jpg'], ['bytes', 'bytea', 'the JPEG'], ['created_at', 'timestamptz', '']], fks: [] },
+    portrait: { g: 'Files', v: 3, why: 'Portrait JPEGs, 256 × 256, a few KB each. Since V7 each one belongs to its campaign, so deleting the campaign deletes its pictures.', code: 'portrait/Portraits.kt',
+      cols: [['key', 'text', 'primary key: <campaign>/<random>.jpg'], ['bytes', 'bytea', 'the JPEG'], ['created_at', 'timestamptz', ''], ['campaign_id', 'uuid', 'indexed; optional for one release so the old version can still save during the deploy', 7]], fks: [['campaign_id', 'campaign', 'cascade', 7]] },
   }
   const MIG = [
     { v: 1, file: 'V1__init.sql', title: 'The first schema', note: 'Eight tables for campaigns, players, characters, monsters and fights, with the event log from day one.', added: ['campaign', 'player', 'character', 'monster_template', 'encounter', 'encounter_party', 'encounter_enemy', 'encounter_event'], changed: [] },
@@ -532,15 +581,20 @@ alter table character add column dndbeyond_url text;
     { v: 4, file: 'V4__dm_devices.sql', title: 'The DM on several devices', note: 'One row per DM browser instead of one hash on the campaign. Existing DMs were copied over in the same migration, so nobody was signed out. The old column is relaxed, not dropped.', added: ['dm_device'], changed: ['campaign'] },
     { v: 5, file: 'V5__npcs.sql', title: 'NPCs', note: 'A new kind of person with HP that carries over, and a table for which NPCs are in a saved fight.', added: ['npc', 'encounter_npc'], changed: [] },
     { v: 6, file: 'V6__dndbeyond_links.sql', title: 'D&D Beyond links', note: 'One optional column. Existing characters simply have no link.', added: [], changed: ['character'] },
+    { v: 7, file: 'V7__tidy_up.sql', title: 'Tidying up', note: 'Fixes the gaps this chapter used to list: five indexes, the leftover DM column dropped (finishing V4’s expand/contract), portraits linked to their campaign, and portrait keys turned into real foreign keys after clearing any that pointed at nothing.', added: [], changed: ['campaign', 'character', 'npc', 'monster_template', 'encounter', 'encounter_party', 'encounter_enemy', 'encounter_npc', 'portrait'] },
   ]
 
-  let ver = 6
+  let ver = 7
+  // A column exists at this version (added, not yet removed); its note can change in a later version.
+  const colAt = (c) => (c[3] || 1) <= ver && !(c[4] && c[4] <= ver)
+  const noteAt = (c) => { const later = c[5] ? Object.keys(c[5]).map(Number).filter((v) => v <= ver) : []; return later.length ? c[5][Math.max(...later)] : c[2] }
+  const fkAt = (f) => (f[3] || 1) <= ver
   let sel = store.get('cdnd-guide-ch1-table', 'encounter_event')
   if (!T[sel]) sel = 'encounter_event'
   const groups = ['People', 'Fight setup', 'The fight', 'Files']
   const related = (name) => {
-    const out = new Set(T[name].fks.map((f) => f[1]))
-    for (const [k, t] of Object.entries(T)) if (t.fks.some((f) => f[1] === name)) out.add(k)
+    const out = new Set(T[name].fks.filter(fkAt).map((f) => f[1]))
+    for (const [k, t] of Object.entries(T)) if (t.fks.some((f) => fkAt(f) && f[1] === name)) out.add(k)
     return out
   }
   const drawSchema = () => {
@@ -550,7 +604,7 @@ alter table character add column dndbeyond_url text;
       const exists = t.v <= ver
       const cls = !exists ? 'absent' : m.added.includes(name) ? 'new' : m.changed.includes(name) ? 'changed' : rel.has(name) ? 'related' : ''
       const badge = cls === 'new' ? '<span class="badge">new</span>' : cls === 'changed' ? '<span class="badge">changed</span>' : ''
-      const cols = t.cols.filter((c) => (c[3] || 1) <= ver).map((c) => c[0]).join(', ')
+      const cols = t.cols.filter(colAt).map((c) => c[0]).join(', ')
       return `<button type="button" class="tbl ${cls}" data-t="${name}" aria-pressed="${name === sel}"${exists ? '' : ` title="Arrives in V${t.v}"`}><b>${badge}${esc(name)}</b><span class="cols">${esc(cols)}</span></button>`
     }).join('')}</div>`).join('')
     $('schema').querySelectorAll('.tbl').forEach((b) => b.addEventListener('click', () => { sel = b.dataset.t; store.set('cdnd-guide-ch1-table', sel); drawSchema(); drawTable() }))
@@ -561,10 +615,12 @@ alter table character add column dndbeyond_url text;
       $('tDetail').innerHTML = `<h3>${esc(sel)}</h3><p>This table arrives in <b>V${t.v}</b>. Move the slider to V${t.v} or later to look inside.</p>`
       return
     }
-    const rows = t.cols.filter((c) => (c[3] || 1) <= ver).map((c) => `<tr class="${c[3] === ver ? 'addedrow' : ''}"><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(c[2])}</td></tr>`).join('')
-    const fks = t.fks.filter((f) => T[f[1]].v <= ver).map((f) => `<li><code>${esc(f[0])}</code> → <b>${esc(f[1])}</b> · on delete <b>${f[2] === 'cascade' ? 'cascade' : 'set null'}</b>: ${f[2] === 'cascade' ? `deleting the ${esc(f[1].replace('_', ' '))} deletes these rows too` : `deleting the ${esc(f[1])} just empties this column`}</li>`).join('')
-    const into = Object.entries(T).filter(([k, x]) => x.v <= ver && x.fks.some((f) => f[1] === sel)).map(([k]) => `<code>${esc(k)}</code>`).join(', ')
+    const dropped = t.cols.filter((c) => c[4] === ver).map((c) => `<code>${esc(c[0])}</code>`).join(', ')
+    const rows = t.cols.filter(colAt).map((c) => `<tr class="${c[3] === ver ? 'addedrow' : ''}"><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(noteAt(c))}</td></tr>`).join('')
+    const fks = t.fks.filter((f) => fkAt(f) && T[f[1]].v <= ver).map((f) => `<li><code>${esc(f[0])}</code> → <b>${esc(f[1])}</b> · on delete <b>${f[2] === 'cascade' ? 'cascade' : 'set null'}</b>: ${f[2] === 'cascade' ? `deleting the ${esc(f[1].replace('_', ' '))} deletes these rows too` : `deleting the ${esc(f[1])} just empties this column`}</li>`).join('')
+    const into = Object.entries(T).filter(([k, x]) => x.v <= ver && x.fks.some((f) => fkAt(f) && f[1] === sel)).map(([k]) => `<code>${esc(k)}</code>`).join(', ')
     $('tDetail').innerHTML = `<h3>${esc(sel)} <span class="small muted" style="font-family: var(--text)">· since V${t.v}</span></h3><p class="small">${esc(t.why)}</p>
+      ${dropped ? `<p class="small" style="color: var(--enemy)">Dropped in this migration: ${dropped}</p>` : ''}
       <div class="scroll"><table class="cols-table"><thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${fks ? `<h3 style="margin-top: 14px; font-size: 16px">Points to</h3><ul class="rel">${fks}</ul>` : ''}
       ${into ? `<p class="small" style="margin: 10px 0 0">Pointed to by ${into}.</p>` : ''}
@@ -602,7 +658,7 @@ alter table character add column dndbeyond_url text;
     ['An event for no fight', "insert into encounter_event (encounter_id, seq, batch, actor_role, type, payload)\nvalues ('00000000-0000-0000-0000-000000000000', 1, 1, 'DM', 'TurnChanged', '{}');", 'ERROR:  insert or update on table "encounter_event" violates foreign key constraint "encounter_event_encounter_id_fkey"\nDETAIL:  Key (encounter_id)=(00000000-…) is not present in table "encounter".',
       'The foreign key: every event must belong to a real encounter. Orphan rows can’t exist.', false],
     ['Delete a whole campaign', "delete from campaign where name = 'Tuesday Group';", 'DELETE 1\n-- and, automatically: its players, DM devices, characters, NPCs, monsters,\n-- encounters, their rosters and every event of every fight',
-      '<code>on delete cascade</code> on every table that points at <code>campaign</code> (and at <code>encounter</code>). One statement removes everything that belonged to it, so nothing is left behind. Portraits are the exception: their keys aren’t foreign keys (see Honest gaps).', true],
+      '<code>on delete cascade</code> on every table that points at <code>campaign</code> (and at <code>encounter</code>). One statement removes everything that belonged to it, so nothing is left behind. Since V7 that includes its portraits.', true],
     ['A campaign with no name', "insert into campaign (join_code) values ('ABC234');", 'ERROR:  null value in column "name" of relation "campaign" violates not-null constraint',
       '<code>not null</code>. The app trims the name and refuses an empty one before it gets here.', false],
   ]
@@ -636,6 +692,23 @@ alter table character add column dndbeyond_url text;
   })
   token = b64url(crypto.getRandomValues(new Uint8Array(32)))
   showHash()
+  /* ---------- index demo: rows looked at, with and without an index ---------- */
+  const SIZES = [100, 1000, 10000, 100000, 1000000, 10000000, 100000000]
+  const drawIx = () => {
+    const n = SIZES[Number($('ixRange').value) - 1]
+    const matches = 6 // one campaign's encounters
+    const depth = Math.max(1, Math.ceil(Math.log(n) / Math.log(250))) // a B-tree page holds a few hundred keys
+    const withIx = depth + matches
+    const fmt = (x) => x.toLocaleString('en-US')
+    $('ixRows').textContent = fmt(n)
+    const bar = (label, v, color) => `<div style="margin: 0 0 10px"><div class="small" style="display:flex;justify-content:space-between;gap:8px"><span>${label}</span><b class="num">${fmt(v)}</b></div><div style="height:10px;border-radius:5px;background:var(--code-bg);border:1px solid var(--border);overflow:hidden"><i style="display:block;height:100%;width:${Math.max(0.6, (Math.log10(v) / Math.log10(SIZES[6])) * 100)}%;background:${color}"></i></div></div>`
+    $('ixBars').innerHTML = bar('Without an index (every row)', n, 'var(--enemy)') + bar(`With an index (${depth} tree steps + ${matches} matches)`, withIx, 'var(--ok)')
+    $('ixNote').textContent = n <= 1000
+      ? 'At this size Postgres may skip the index anyway: reading a few pages directly is just as cheap.'
+      : `About ${fmt(Math.round(n / withIx))} times less work. Bars use a log scale; without one the green bar would be invisible.`
+  }
+  $('ixRange').addEventListener('input', drawIx)
+  drawIx()
   bindGlossary(document)
 }
 </script>
