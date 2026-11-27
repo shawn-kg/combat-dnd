@@ -15,15 +15,16 @@ import javax.imageio.ImageWriteParam
 
 /** Where portrait files live. */
 interface PortraitStore {
-    fun save(key: String, bytes: ByteArray)
+    /** Saves a picture for this campaign; deleting the campaign deletes it (V7). */
+    fun save(key: String, campaignId: UUID, bytes: ByteArray)
     fun load(key: String): ByteArray?
 }
 
 /** Portraits in Postgres (table `portrait`). A few KB each, so a whole campaign's worth is tiny. */
 @Component
 class DbPortraitStore(private val jdbc: JdbcClient) : PortraitStore {
-    override fun save(key: String, bytes: ByteArray) {
-        jdbc.sql("insert into portrait (key, bytes) values (?, ?)").params(key, bytes).update()
+    override fun save(key: String, campaignId: UUID, bytes: ByteArray) {
+        jdbc.sql("insert into portrait (key, campaign_id, bytes) values (?, ?, ?)").params(key, campaignId, bytes).update()
     }
 
     override fun load(key: String): ByteArray? =
@@ -49,7 +50,7 @@ class PortraitService(private val store: PortraitStore) {
         val image = runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()
             ?: throw BadRequest("That file isn't a picture we can read. Use a JPEG or PNG.")
         val key = "$campaignId/${UUID.randomUUID()}.jpg"
-        store.save(key, toJpeg(squareThumbnail(image)))
+        store.save(key, campaignId, toJpeg(squareThumbnail(image)))
         return key
     }
 
